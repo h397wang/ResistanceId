@@ -38,7 +38,7 @@ void trackbarCallback_getResistorContours( int aUnused ) {
 			vpContours,
 			cvScalarAll(0), // external colour
 			cvScalarAll(255), // hole colour
-			100, // max level
+			3, // max level
 			4 // line thickness
 			);
 	}

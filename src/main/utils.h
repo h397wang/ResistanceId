@@ -9,7 +9,7 @@ CvBox2D* getResistorRoi( IplImage* apImg );
 
 CvSeq* getResistorContours(
 	IplImage* apImg,
-	int aCannyThreshLow,
+	int aCannyThreshLow = 50,
 	int aCannyThreshHigh,
 	int aContourMode
 	);
