@@ -13,5 +13,3 @@ CvSeq* getResistorContours(
 	int aCannyThreshHigh,
 	int aContourMode
 	);
-
-CvSeq* filterContours( CvSeq* apAllContours );

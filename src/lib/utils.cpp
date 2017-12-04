@@ -43,10 +43,3 @@ CvSeq* getResistorContours(
 	return vpContours;
 	
 }
-
-CvSeq* filterContours( CvSeq* apAllContours ) {
-
-
-
-}
-
