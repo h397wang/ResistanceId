@@ -14,6 +14,6 @@ if __name__ == '__main__':
 	cmd += " -numStages 9"
 	cmd += " -w 128"
 	cmd += " -h 128"
-
+	cmd += " -mode ALL"
 	print(cmd)
-	os.system(cmd)
+	#os.system(cmd)

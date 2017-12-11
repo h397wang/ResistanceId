@@ -2,21 +2,31 @@
 
 #include "testWrappers.h"
 
-#include "../lib/utils.h"
-
-
 IplImage* gpImg = NULL;
+IplImage* gpImgFiltered = NULL;
 
-int gCannyThreshLow = 0;
-int gCannyThreshHigh = 0;
-int gContourMode = 0;
+int gCannyThreshLow = 110;
+int gCannyThreshHigh = 150;
+int gContourMode = CV_RETR_LIST;
 
 
 const char* gpWindowNameOutput = "Output";
 const char* gpWindowNameOriginal = "Original";
 
+static CvScalar colors[] = {
+    CvScalar(0,0,255),
+    CvScalar(0,128,255),
+    CvScalar(0,255,255),
+    CvScalar(0,255,0),
+    CvScalar(255,128,0),
+    CvScalar(255,255,0),
+    CvScalar(255,0,0),
+    CvScalar(255,0,255),
+};
+
 void trackbarCallback_getResistorContours( int aUnused ) {
 	CvSeq* vpContours = NULL;
+	CvMoments vMoments;
 
 	IplImage* gpImgTmp = cvCreateImage( 
 		cvSize( gpImg->width, gpImg->height ),
@@ -32,16 +42,31 @@ void trackbarCallback_getResistorContours( int aUnused ) {
 		gContourMode
 		);
 
-	if( vpContours ) {
-		cvDrawContours(
-			gpImgTmp,
-			vpContours,
-			cvScalarAll(0), // external colour
-			cvScalarAll(255), // hole colour
-			3, // max level
-			4 // line thickness
-			);
+	int seqCount = 0;
+	CvSeq* vpCurrentSeq = vpContours;
+
+	while (vpCurrentSeq != NULL) {
+		if (vpCurrentSeq->total > 100) {
+			printSeqInfo(vpCurrentSeq);
+
+			cvMoments(
+				vpCurrentSeq,
+				&vMoments
+				);
+			printMomentInfo(&vMoments);
+
+			cvDrawContours(
+				gpImgTmp,
+				vpCurrentSeq,
+				cvScalarAll(0), 	// external colour
+				cvScalarAll(155), 	// hole colour
+				0, 					// max level
+				4 					// line thickness
+				);
+		}
+		vpCurrentSeq = vpCurrentSeq->h_next;
 	}
+	seqCount++;
 
 	cvShowImage( gpWindowNameOutput, gpImgTmp );
 	cvShowImage( gpWindowNameOriginal, gpImg );
@@ -97,4 +122,132 @@ int test_getResistorContours( char* apImagePath ) {
 	cvWaitKey(0);
 	return 0;
 }
+
+int test_haarCascade( char* apImagePath ) {
+
+#if 0
+    // Account for bullshit bug
+    IplImage* vpImgTmp = cvLoadImage("/Users/henrywang/Documents/SideProjects/ComputerVisionProj/ResistanceId/images/pos/r0.jpg");              // load the image 
+    cvErode(vpImgTmp, vpImgTmp, 0, 3); 
+    cvReleaseImage(&vpImgTmp); 
+
+    CvMemStorage* vpStorage = cvCreateMemStorage(0);
+
+    // Relative path from execution directory
+    //const char* vCascadeFile = "/Users/henrywang/Documents/SideProjects/ComputerVisionProj/ResistanceId/data/data_24_24/cascade.xml";
+    const char* vCascadeFile = "/Users/henrywang/Documents/SideProjects/opencv-3.2.0/data/haarcascades/haarcascade_eye.xml";
+
+    CvHaarClassifierCascade* vpCascadeClassifier = NULL;
+    vpCascadeClassifier = (CvHaarClassifierCascade*) cvLoad( vCascadeFile, 0, 0, 0 );
+    if ( vpCascadeClassifier == NULL ) {
+        printf( "Error: could not open casecade file %s", vCascadeFile );
+        return -1;
+    } 
+
+    IplImage* vpImg = cvLoadImage( apImagePath );
+    if ( vpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
+
+    CvSeq* vpRoiSeq = cvHaarDetectObjects(
+        vpImg,
+        vpCascadeClassifier,
+        vpStorage,
+        1.1,                        // scale factor
+        3,                          // min neighbours
+        CV_HAAR_DO_CANNY_PRUNING    // skip "flat" regions
+        | CV_HAAR_SCALE_IMAGE ,    // performance optimization
+        CvSize(24, 24)               // smallest region to search
+    );
+
+    for(int i = 0; i < (vpRoiSeq ? vpRoiSeq->total : 0); i++ ) {
+        CvRect* vpRect = (CvRect*) cvGetSeqElem(vpRoiSeq, i);
+        cvRectangle(
+            vpImg,
+            cvPoint(vpRect->x, vpRect->y),
+            cvPoint(vpRect->x + vpRect->width, vpRect->y + vpRect->height),
+            colors[i % 8]
+            );
+    }
+
+    cvNamedWindow( gpWindowNameOriginal );
+    cvShowImage( gpWindowNameOutput, vpImg );
+    cvWaitKey(0);
+#endif
+    return 0;
+}
+
+
+void trackbarCallback_filterNoise( int aUnused ) {
+    //filterNoise( gpImg, gpImgFiltered );
+    getResistorRoi(gpImg);
+    cvShowImage( gpWindowNameOriginal, gpImg );
+    cvShowImage( gpWindowNameOutput, gpImgFiltered );
+}
+
+int test_filterNoise( char* apImagePath ) {
+
+    gpImg = cvLoadImage( apImagePath );
+    if ( gpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
+
+    gpImgFiltered = cvCreateImage( 
+        cvSize( gpImg->width, gpImg->height ),
+        gpImg->depth,
+        gpImg->nChannels
+        );
+
+    cvCreateTrackbar(
+        "Temp",
+        gpWindowNameOutput,
+        &gCannyThreshHigh,
+        255,
+        trackbarCallback_filterNoise
+        );
+
+    cvNamedWindow( gpWindowNameOriginal );
+    cvNamedWindow( gpWindowNameOutput );
+    trackbarCallback_filterNoise( 0 );
+    cvWaitKey(0);
+    return 0;
+}
+
+
+// ----------------------------------------------------------------------
+// helpers
+// ----------------------------------------------------------------------
+
+// Assumes a sequence of CvPoint elements
+void printSeqInfo( CvSeq* apSeq) {
+	printf( "Number of elements in sequence: %d\n", apSeq->total );
+	for( int i = 0; i < apSeq->total; ++i ) {
+		CvPoint* vPoint = (CvPoint*) cvGetSeqElem( apSeq, i );
+		//printf("(%d,%d)\n", vPoint->x, vPoint->y );
+	}
+}
+
+void printMomentInfo( CvMoments* apMoment ) {
+	/*
+	// spatial moments
+	double m00, m10, m01, m20, m11, m02, m30, m21, m12, m03;
+	// central moments
+	double mu20, mu11, mu02, mu30, mu21, mu12, mu03;
+	// m00 != 0 ? 1/sqrt(m00)
+	*/
+
+	printf("Spatial Moments:\n");
+	printf("\tm00: %.2f\n", apMoment->m00);
+	printf("\tm10: %.2f\n", apMoment->m10);
+	printf("\tm01: %.2f\n", apMoment->m01);
+	printf("\tm11: %.2f\n", apMoment->m01);
+
+	printf("Central Moments:\n");
+	printf("\tmu20: %.2f\n", apMoment->mu20);
+	printf("\tmu11: %.2f\n", apMoment->mu11);
+	printf("\tmu02: %.2f\n", apMoment->mu02);
+}
+
 

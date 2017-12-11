@@ -1,6 +1,7 @@
 from optparse import OptionParser
 import glob
 import os
+import sys
 
 gExtTypes = [
 	'jpg',
@@ -31,9 +32,10 @@ if __name__ == '__main__':
 
 	(options, args) = parser.parse_args()
 
-	imgDir = os.path.abspath("../images")
-	negImgDir = os.path.join(imgDir, "neg")
-	tmpDir = os.path.join(imgDir, "tmp")
+	imgDir 		= os.path.abspath("../images")
+	negImgDir 	= os.path.join(imgDir, "neg")
+	tmpDir 		= os.path.join(imgDir, "tmp")
+
 	if not os.path.exists(tmpDir):
 		os.mkdir(tmpDir)
 	else:
@@ -41,7 +43,8 @@ if __name__ == '__main__':
 		print(cmd)
 		os.system(cmd)
 
-	f = open(os.path.join(imgDir, "neg.txt"), "w")
+	fileHandleAbs = open(os.path.join(imgDir, "neg_abs.txt"), "w")
+	fileHandleRel = open(os.path.join(imgDir, "neg_rel.txt"), "w")
 
 	imgFiles = []
 	for ext in gExtTypes:
@@ -69,10 +72,18 @@ if __name__ == '__main__':
 		srcFilePath = os.path.abspath(tmpImgFiles[i])
 		dstFilePath = os.path.join(negImgDir, fileName)
 		
-		f.write("neg/" + fileName  + "\n")
+		fileHandleAbs.write(dstFilePath + "\n")
+		fileHandleRel.write("neg/" + fileName + "\n")
 
 		cmd = "cp " + srcFilePath + " " + dstFilePath
 		print(cmd)
 		os.system(cmd)
 	
-	f.close()
+	cmd = "rm -f " + tmpDir + "/*"
+	print(cmd)
+	os.system(cmd)
+
+	fileHandleAbs.close()
+	fileHandleRel.close()
+	
+	sys.exit(0)

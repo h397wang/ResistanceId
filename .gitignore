@@ -6,3 +6,4 @@ build/*
 images/*
 vec/*
 data/*
+docs/*

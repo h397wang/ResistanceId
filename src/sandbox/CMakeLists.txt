@@ -6,5 +6,3 @@ aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}  SRC_LIST)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/../lib  SRC_LIST_LIB)
 add_executable(${PROJECT_NAME} ${SRC_LIST} ${SRC_LIST_LIB} )
 target_link_libraries( ${PROJECT_NAME} ${OpenCV_LIBS} )
-
-
