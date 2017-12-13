@@ -9,11 +9,15 @@ int gCannyThreshLow = 110;
 int gCannyThreshHigh = 150;
 int gContourMode = CV_RETR_LIST;
 
+int gHoughLineAccumThresh = 80;
+
+using namespace cv;
+using namespace std;
 
 const char* gpWindowNameOutput = "Output";
 const char* gpWindowNameOriginal = "Original";
 
-static CvScalar colors[] = {
+static CvScalar gColors[] = {
     CvScalar(0,0,255),
     CvScalar(0,128,255),
     CvScalar(0,255,255),
@@ -125,12 +129,45 @@ int test_getResistorContours( char* apImagePath ) {
 
 int test_haarCascade( char* apImagePath ) {
 
-#if 0
-    // Account for bullshit bug
-    IplImage* vpImgTmp = cvLoadImage("/Users/henrywang/Documents/SideProjects/ComputerVisionProj/ResistanceId/images/pos/r0.jpg");              // load the image 
-    cvErode(vpImgTmp, vpImgTmp, 0, 3); 
-    cvReleaseImage(&vpImgTmp); 
+    Mat frame = imread( apImagePath );
 
+    const char* vCascadeFile = "/Users/henrywang/Documents/SideProjects/opencv-3.2.0/data/haarcascades/haarcascade_eye.xml";
+    CascadeClassifier vDetect;
+    if ( !vDetect.load(vCascadeFile) ) {
+        printf("ERROR: Could not load face cascade\n");
+        return -1;
+    }
+    vector<Rect> vRois;
+
+    vDetect.detectMultiScale(
+        frame,
+        vRois,
+        1.1,
+        2,
+        0
+        //|CASCADE_FIND_BIGGEST_OBJECT
+        //|CASCADE_DO_ROUGH_SEARCH
+        | CASCADE_SCALE_IMAGE,
+        Size(24, 24),
+        Size(200, 200)
+        );
+
+    printf("num of rois %lu\n", vRois.size());
+
+    for ( size_t i = 0; i < vRois.size(); i++ ) {
+        Rect r = vRois[i];
+        rectangle(
+            frame,
+            cvPoint(cvRound(r.x), cvRound(r.y)),
+            cvPoint(cvRound((r.x + r.width-1)), cvRound((r.y + r.height-1))),
+            gColors[0],
+            3,
+            8,
+            0
+            );
+    }
+
+#if 0
     CvMemStorage* vpStorage = cvCreateMemStorage(0);
 
     // Relative path from execution directory
@@ -144,7 +181,7 @@ int test_haarCascade( char* apImagePath ) {
         return -1;
     } 
 
-    IplImage* vpImg = cvLoadImage( apImagePath );
+    IplImage* vpImg = cvLoadImage( apImagePath ) {
     if ( vpImg == NULL ) {
         printf( "Error: could not open image %s", apImagePath );
         return -1;
@@ -175,13 +212,15 @@ int test_haarCascade( char* apImagePath ) {
     cvShowImage( gpWindowNameOutput, vpImg );
     cvWaitKey(0);
 #endif
+    namedWindow(gpWindowNameOutput);
+    imshow(gpWindowNameOutput, frame);
+    waitKey(0);
     return 0;
 }
 
 
 void trackbarCallback_filterNoise( int aUnused ) {
-    //filterNoise( gpImg, gpImgFiltered );
-    getResistorRoi(gpImg);
+    filterNoise( gpImg, gpImgFiltered );
     cvShowImage( gpWindowNameOriginal, gpImg );
     cvShowImage( gpWindowNameOutput, gpImgFiltered );
 }
@@ -212,6 +251,44 @@ int test_filterNoise( char* apImagePath ) {
     cvNamedWindow( gpWindowNameOutput );
     trackbarCallback_filterNoise( 0 );
     cvWaitKey(0);
+    return 0;
+}
+
+void trackbarCallback_getResistorRoi( int aUnused ) {
+
+    IplImage* vpImgTmp = cvCreateImage( 
+        cvSize( gpImg->width, gpImg->height ),
+        gpImg->depth,
+        gpImg->nChannels
+        );
+    cvCopy( gpImg, vpImgTmp );
+    getResistorRoi( vpImgTmp, gHoughLineAccumThresh );
+    cvShowImage( gpWindowNameOriginal, gpImg );
+    cvShowImage( gpWindowNameOutput, vpImgTmp );
+
+    printf( "gHoughLineAccumThresh: %d\n", gHoughLineAccumThresh );
+}
+
+int test_getResistorRoi( char* apImagePath ) {
+    gpImg = cvLoadImage( apImagePath );
+    if ( gpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
+
+    cvNamedWindow( gpWindowNameOriginal );
+    cvNamedWindow( gpWindowNameOutput );
+
+    cvCreateTrackbar(
+        "Accumulator Threshold",
+        gpWindowNameOutput,
+        &gHoughLineAccumThresh,
+        max( gpImg->width, gpImg->height ),
+        trackbarCallback_getResistorRoi
+        );
+
+    trackbarCallback_getResistorRoi( 0 );
+    cvWaitKey( 0 );
     return 0;
 }
 

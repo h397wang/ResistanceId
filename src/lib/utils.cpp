@@ -98,7 +98,11 @@ void filterForLineDetect(
 		);
 }
 
-CvBox2D* getResistorRoi( IplImage* apImg ) {
+CvBox2D* getResistorRoi(
+	IplImage* apImg,
+	int aHoughLineAccumThresh
+	)
+{
 	IplImage* vpImageFiltered = cvCreateImage( 
 		cvGetSize( apImg ),
 		apImg->depth,
@@ -137,48 +141,76 @@ CvBox2D* getResistorRoi( IplImage* apImg ) {
 		);
 
 	CvMemStorage* vpStorage = cvCreateMemStorage(0);
-	const double vRho = 4;
-	const double vTheta = 4 * M_PI / 180;
-	const int vThreshold = 50; // dependent on image size
+	const double vRho = 1;
+	const double vTheta = 1 * M_PI / 180;
+	const int vHoughMethod = CV_HOUGH_STANDARD; //CV_HOUGH_PROBABILISTIC
 	CvSeq* vpLines = cvHoughLines2(
 		vpImgEdges,
 		vpStorage,
-		CV_HOUGH_PROBABILISTIC, //CV_HOUGH_STANDARD,
+		vHoughMethod,
 		vRho,	
 		vTheta,
-		vThreshold
+		aHoughLineAccumThresh
 		);
 
 	for ( int i = 0; i < vpLines->total; i++ ) {
-		CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( vpLines , i );
-		cvLine(apImg, vpPoints[0], vpPoints[1], cvScalar(255, 255, 255));
+		if ( vHoughMethod == CV_HOUGH_PROBABILISTIC ) {
+			CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( vpLines , i );
+			cvLine(apImg, vpPoints[0], vpPoints[1], cvScalar(0, 0, 0));
+
+		} else if ( vHoughMethod == CV_HOUGH_STANDARD ) {
+			float* vpRhoTheta = (float*) cvGetSeqElem( vpLines , i );
+			float vRho = vpRhoTheta[0];
+			float vTheta = vpRhoTheta[1];
+			lineStartEnd_t vLine;
+			vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
+			cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
+		}	
 	}
+
 
 	CvBox2D* vpRoi;
 	return vpRoi;
 }
 
-void polarToCartesian(
+lineStartEnd_t getLineFromPolar(
 	CvSize aSize,
 	float aRho,
 	float aTheta
 	)
 {
-	// Do  switch case for the phasor, depending on which quadrant it's in
 	float vX = aRho * cos(aTheta);
 	float vY = aRho * sin(aTheta);
 	float vLineSlope =  - (vX / vY);
-	int vYInter = aSize.height - round( vY - vLineSlope * vX );
+	int vYInter = round( vY - vLineSlope * vX );
 	int vXinter = - round(vYInter / vLineSlope);
+	int vYRightBorderInter = vY + vLineSlope * (aSize.width - vX);
+
 	CvPoint vSrtPnt = cvPoint( 0, vYInter );
-	CvPoint vEndPnt = cvPoint( vXinter, aSize.height );
+	CvPoint vEndPnt = cvPoint( aSize.width, vYRightBorderInter );
 
 	bool vIsPlottable = cvClipLine(
 		aSize,
 		&vSrtPnt,
 		&vEndPnt
 		);
-	printf("rho, theta = (%.2f, %.2f)\n", vX, vY);
+
+	lineStartEnd_t vLine;
+
+	if (vIsPlottable) {
+		vLine.mStart = vSrtPnt;
+		vLine.mEnd = vEndPnt;		
+	}
+
+	return vLine;
+}
+
+CvSeq* groupLines(
+    CvSeq* apLines
+    )
+{
+	
+
 }
 
 CvSeq* getResistorContours(
