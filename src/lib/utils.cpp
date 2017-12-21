@@ -162,12 +162,18 @@ CvBox2D* getResistorRoi(
 			float* vpRhoTheta = (float*) cvGetSeqElem( vpLines , i );
 			float vRho = vpRhoTheta[0];
 			float vTheta = vpRhoTheta[1];
-			lineStartEnd_t vLine;
-			vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
+			lineStartEnd_t vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
 			cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
 		}	
 	}
 
+	lineGroup_t vLineGroupOfInterest = getLineGroupOfInterest(vpLines);
+	lineStartEnd_t vLineOfInterest = getLineFromPolar(
+		cvGetSize( apImg ),
+		vLineGroupOfInterest.mRhoSum / vLineGroupOfInterest.mNumLines,
+		vLineGroupOfInterest.mThetaSum / vLineGroupOfInterest.mNumLines
+		);
+	cvLine(apImg, vLineOfInterest.mStart, vLineOfInterest.mEnd, cvScalar(255, 255, 255));
 
 	CvBox2D* vpRoi;
 	return vpRoi;
@@ -205,12 +211,75 @@ lineStartEnd_t getLineFromPolar(
 	return vLine;
 }
 
-CvSeq* groupLines(
-    CvSeq* apLines
+lineGroup_t getLineGroupOfInterest(
+    CvSeq* apLines,
+    float aRhoEps,
+    float aThetaEps
     )
 {
-	
 
+	CvMemStorage* vpStorage = cvCreateMemStorage(0);
+
+	// Create linked list of line groups
+	CvSeq* vpLineGroups = cvCreateSeq(
+		0,
+		sizeof(CvSeq),
+		sizeof(lineGroup_t),
+		vpStorage
+	);
+
+	float* vpRhoTheta = (float*) cvGetSeqElem( apLines , 0 );
+	float vRho = vpRhoTheta[0];
+	float vTheta = vpRhoTheta[1];
+
+	lineGroup_t vFirstLineGroup = { 1, vRho, vTheta };
+
+	// Add the first line group
+	cvSeqPush(
+		vpLineGroups,		
+		&vFirstLineGroup
+	);
+
+	// Go through the rest of the lines
+	for ( int i = 1; i < apLines->total; i++ ) {
+		vpRhoTheta = (float*) cvGetSeqElem( apLines , i );
+		vRho = vpRhoTheta[0];
+		vTheta = vpRhoTheta[1];
+
+		// Check against each line group
+		for ( int j = 0; j < vpLineGroups->total; j++ ) {
+			lineGroup_t* vpCurrentLineGroup = (lineGroup_t*) cvGetSeqElem( vpLineGroups , j );
+			float vRhoAvg = vpCurrentLineGroup->mRhoSum / vpCurrentLineGroup->mNumLines;
+			float vThetaAvg = vpCurrentLineGroup->mThetaSum / vpCurrentLineGroup->mNumLines;
+			
+			if ( 1
+				&& ( abs(vRho - vRhoAvg) < aRhoEps ) 
+				&& ( abs(vTheta - vThetaAvg) < aThetaEps ) ) {
+				// Add to the current line group
+				vpCurrentLineGroup->mRhoSum += vRho;
+				vpCurrentLineGroup->mThetaSum += vTheta;
+				vpCurrentLineGroup->mNumLines++;
+			} else {
+				// Make a new line group
+
+				lineGroup_t vNewLineGroup = { 1, vRho, vTheta };
+				cvSeqPush( vpLineGroups, &vNewLineGroup );
+			}
+		}
+	}
+
+	// Get the line group to be returned
+	lineGroup_t vLineGroupToRet =  * ((lineGroup_t*) cvGetSeqElem( vpLineGroups , 0 ) );
+	for ( int i = 1; i < vpLineGroups->total; i++ ) {
+		lineGroup_t* vpCurrentLineGroup = (lineGroup_t*) cvGetSeqElem( vpLineGroups , i );
+		if ( vpCurrentLineGroup->mNumLines > vLineGroupToRet.mNumLines ) {
+			vLineGroupToRet = * vpCurrentLineGroup;
+		}
+	}
+
+	cvReleaseMemStorage( &vpStorage );
+
+	return vLineGroupToRet; 
 }
 
 CvSeq* getResistorContours(

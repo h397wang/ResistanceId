@@ -12,7 +12,9 @@ typedef struct {
 } lineStartEnd_t;
 
 typedef struct {
-    CvSeq* mpLines;
+    int mNumLines;
+    float mRhoSum;
+    float mThetaSum;
 } lineGroup_t;
 
 void filterNoise(
@@ -31,8 +33,10 @@ lineStartEnd_t getLineFromPolar(
     float aTheta
     );
 
-lineStartEnd_t sortLines(
-    CvSeq* vpLines
+lineGroup_t getLineGroupOfInterest(
+    CvSeq* apLines,
+    float aRhoEps = 100,
+    float aThetaEps = 0.1
     );
 
 CvSeq* getResistorContours(
