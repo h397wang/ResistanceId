@@ -262,7 +262,10 @@ void trackbarCallback_getResistorRoi( int aUnused ) {
         gpImg->nChannels
         );
     cvCopy( gpImg, vpImgTmp );
-    getResistorRoi( vpImgTmp, gHoughLineAccumThresh );
+    CvBox2D vRoi = getResistorRoi( vpImgTmp, gHoughLineAccumThresh );
+
+    drawCvBox2D( vpImgTmp, vRoi );
+
     cvShowImage( gpWindowNameOriginal, gpImg );
     cvShowImage( gpWindowNameOutput, vpImgTmp );
 

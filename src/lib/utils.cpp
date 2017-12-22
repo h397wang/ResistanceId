@@ -98,16 +98,18 @@ void filterForLineDetect(
 		);
 }
 
-CvBox2D* getResistorRoi(
+CvBox2D getResistorRoi(
 	IplImage* apImg,
-	int aHoughLineAccumThresh
+	const int aHoughLineAccumThresh
 	)
 {
+	// No change to input image, make a copy
 	IplImage* vpImageFiltered = cvCreateImage( 
 		cvGetSize( apImg ),
 		apImg->depth,
 		apImg->nChannels
 		);
+
 	filterNoise(apImg, vpImageFiltered);
 
 	IplImage* vpImgFilteredGray = cvCreateImage( 
@@ -115,6 +117,7 @@ CvBox2D* getResistorRoi(
 		apImg->depth,
 		1
 		);
+
 	cvCvtColor(
 		vpImageFiltered,
 		vpImgFilteredGray,
@@ -125,7 +128,6 @@ CvBox2D* getResistorRoi(
     	vpImgFilteredGray,
     	vpImgFilteredGray
     	);
-
 	IplImage* vpImgEdges = cvCreateImage( 
 		cvGetSize( apImg ),
 		apImg->depth,
@@ -153,6 +155,7 @@ CvBox2D* getResistorRoi(
 		aHoughLineAccumThresh
 		);
 
+	// Show the lines that were found
 	for ( int i = 0; i < vpLines->total; i++ ) {
 		if ( vHoughMethod == CV_HOUGH_PROBABILISTIC ) {
 			CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( vpLines , i );
@@ -167,16 +170,97 @@ CvBox2D* getResistorRoi(
 		}	
 	}
 
-	lineGroup_t vLineGroupOfInterest = getLineGroupOfInterest(vpLines);
-	lineStartEnd_t vLineOfInterest = getLineFromPolar(
+	// Get line groups
+	const lineGroup_t vLineGroupOfInterest = getLineGroupOfInterest(vpLines);
+	const float vLineGroupAvgTheta = vLineGroupOfInterest.mThetaSum / vLineGroupOfInterest.mNumLines;
+	const float vLineGroupAvgRho   = vLineGroupOfInterest.mRhoSum / vLineGroupOfInterest.mNumLines;
+
+	const lineStartEnd_t vLineOfInterest = getLineFromPolar(
 		cvGetSize( apImg ),
-		vLineGroupOfInterest.mRhoSum / vLineGroupOfInterest.mNumLines,
-		vLineGroupOfInterest.mThetaSum / vLineGroupOfInterest.mNumLines
+		vLineGroupAvgRho,
+		vLineGroupAvgTheta
 		);
+
+	// Show dominant line
 	cvLine(apImg, vLineOfInterest.mStart, vLineOfInterest.mEnd, cvScalar(255, 255, 255));
 
-	CvBox2D* vpRoi;
-	return vpRoi;
+	// Add top and bottom parallel lines
+
+	
+	// Clip lines to image size
+	// TODO: extract block below into function
+	// TODO: not the best idea, because of symmetrical clipping, reconsider
+	const CvPoint2D32f vRoiCenter = cvPoint2D32f(
+		(vLineOfInterest.mStart.x + vLineOfInterest.mEnd.x) / 2,
+		(vLineOfInterest.mStart.y + vLineOfInterest.mEnd.y) / 2
+		);
+
+	// Create return value
+	// TODO: Bad heuristic for height value
+	const float vRoiHeight = 0.3 * (float) apImg->height;
+	const float vLineLength = sqrt( 0
+		+ pow(abs(vLineOfInterest.mStart.x - vLineOfInterest.mEnd.x), 2)
+		+ pow(abs(vLineOfInterest.mStart.y - vLineOfInterest.mEnd.y), 2)
+		);
+	const float vLineRadFromXAxis = fmodf(vLineGroupAvgTheta, M_PI / 2);
+
+	const float vWidthClipped = vRoiHeight / tan( vLineRadFromXAxis );
+	const CvSize2D32f vRoiSize = cvSize2D32f(
+		vLineLength - vWidthClipped,
+		vRoiHeight
+		);
+	CvBox2D vRoi;
+	vRoi.center = vRoiCenter;
+	vRoi.size = vRoiSize;
+	vRoi.angle = vLineRadFromXAxis;
+
+	printf( "center: (%d, %d)\n", (int) vRoiCenter.x, (int) vRoiCenter.y );
+	printf( "size: %d x %d\n", (int) vRoiSize.width, (int) vRoiSize.height );
+	printf( "angle: %f\n", vRoi.angle );
+
+	return vRoi;
+}
+
+void drawCvBox2D(
+	IplImage* apImg,
+	const CvBox2D aBox2D
+	)
+{	
+
+	const int vWidthXProj = aBox2D.size.width * cos(aBox2D.angle) / 2;
+	const int vHeightYProj = aBox2D.size.height * cos(aBox2D.angle) / 2;
+
+	const int vWidthYProj = aBox2D.size.width * sin(aBox2D.angle) / 2;
+	const int vHeightXProj = aBox2D.size.height * sin(aBox2D.angle) / 2;
+
+	printf( "vWidthXProj: %d\n", vWidthXProj );
+	printf( "vHeightYProj: %d\n", vHeightYProj );
+	
+	const CvPoint vTopLeft = cvPoint(
+		aBox2D.center.x - vWidthXProj + vHeightXProj,
+		aBox2D.center.y - vHeightYProj - vWidthYProj
+		);
+
+	const CvPoint vTopRight = cvPoint(
+		aBox2D.center.x + vWidthXProj + vHeightXProj,
+		aBox2D.center.y - vHeightYProj + vWidthYProj
+		);
+
+	const CvPoint vBotLeft = cvPoint(
+		aBox2D.center.x - vWidthXProj - vHeightXProj,
+		aBox2D.center.y + vHeightYProj - vWidthYProj
+		);
+
+	const CvPoint vBotRight = cvPoint(
+		aBox2D.center.x + vWidthXProj - vHeightXProj,
+		aBox2D.center.y + vHeightYProj + vWidthYProj
+		);
+
+	cvLine(apImg, vTopLeft, vTopRight, cvScalar(255, 255, 255), 3);
+	cvLine(apImg, vBotLeft, vBotRight, cvScalar(255, 255, 255), 3);
+	cvLine(apImg, vTopLeft, vBotLeft, cvScalar(255, 255, 255), 3);
+	cvLine(apImg, vTopRight, vBotRight, cvScalar(255, 255, 255), 3);
+
 }
 
 lineStartEnd_t getLineFromPolar(

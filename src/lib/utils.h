@@ -22,9 +22,14 @@ void filterNoise(
     IplImage* apImgDst
     );
 
-CvBox2D* getResistorRoi(
+CvBox2D getResistorRoi(
     IplImage* apImg,
-    int aHoughLineAccumThresh = 65 // determined through characterization, depends on img size
+    const int aHoughLineAccumThresh = 65 // determined through characterization, depends on img size
+    );
+
+void drawCvBox2D(
+    IplImage* apImg,
+    const CvBox2D aBox2D
     );
 
 lineStartEnd_t getLineFromPolar(
