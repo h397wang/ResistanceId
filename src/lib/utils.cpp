@@ -186,7 +186,7 @@ CvBox2D getResistorRoi(
 
 	// Add top and bottom parallel lines
 
-	
+
 	// Clip lines to image size
 	// TODO: extract block below into function
 	// TODO: not the best idea, because of symmetrical clipping, reconsider
@@ -204,7 +204,9 @@ CvBox2D getResistorRoi(
 		);
 	const float vLineRadFromXAxis = fmodf(vLineGroupAvgTheta, M_PI / 2);
 
-	const float vWidthClipped = vRoiHeight / tan( vLineRadFromXAxis );
+	//const float vWidthClipped = vRoiHeight / tan( vLineRadFromXAxis );
+	const float vWidthClipped = vRoiHeight * sin( vLineRadFromXAxis );
+	
 	const CvSize2D32f vRoiSize = cvSize2D32f(
 		vLineLength - vWidthClipped,
 		vRoiHeight
@@ -214,11 +216,93 @@ CvBox2D getResistorRoi(
 	vRoi.size = vRoiSize;
 	vRoi.angle = vLineRadFromXAxis;
 
+	CvBox2D vRoiClipped = clipCvBox2DToFit( 
+		cvGetSize( apImg ),
+		vRoi
+		);
+
+#if 0
 	printf( "center: (%d, %d)\n", (int) vRoiCenter.x, (int) vRoiCenter.y );
 	printf( "size: %d x %d\n", (int) vRoiSize.width, (int) vRoiSize.height );
 	printf( "angle: %f\n", vRoi.angle );
+#endif
+	return vRoiClipped;
+}
 
-	return vRoi;
+// TODO: extract duplicated code
+CvBox2D clipCvBox2DToFit( 
+	CvSize aSize,
+	CvBox2D aBox2D
+	)
+{
+	const int vWidthXProj = aBox2D.size.width * cos( aBox2D.angle ) / 2;
+	const int vHeightYProj = aBox2D.size.height * cos( aBox2D.angle ) / 2;
+
+	const int vWidthYProj = aBox2D.size.width * sin( aBox2D.angle ) / 2;
+	const int vHeightXProj = aBox2D.size.height * sin( aBox2D.angle ) / 2;
+
+	CvPoint vTopLeft = cvPoint(
+		aBox2D.center.x - vWidthXProj + vHeightXProj,
+		aBox2D.center.y - vHeightYProj - vWidthYProj
+		);
+
+	CvPoint vTopRight = cvPoint(
+		aBox2D.center.x + vWidthXProj + vHeightXProj,
+		aBox2D.center.y - vHeightYProj + vWidthYProj
+		);
+
+	CvPoint vBotLeft = cvPoint(
+		aBox2D.center.x - vWidthXProj - vHeightXProj,
+		aBox2D.center.y + vHeightYProj - vWidthYProj
+		);
+
+	CvPoint vBotRight = cvPoint(
+		aBox2D.center.x + vWidthXProj - vHeightXProj,
+		aBox2D.center.y + vHeightYProj + vWidthYProj
+		);
+
+	// All lines should be plottable
+	cvClipLine(
+		aSize,
+		&vTopLeft,
+		&vTopRight
+		);
+
+	cvClipLine(
+		aSize,
+		&vBotLeft,
+		&vBotRight
+		);
+	
+	const int vWidthTop = sqrt( 0
+		+ pow( abs( vTopLeft.x - vTopRight.x ), 2 )
+		+ pow( abs( vTopLeft.y - vTopRight.y ), 2 )
+		);
+
+	const int vWidthBot = sqrt( 0
+		+ pow( abs( vBotLeft.x - vBotRight.x ), 2 )
+		+ pow( abs( vBotLeft.y - vTopRight.y ), 2 )
+		);
+
+	const int vNewWidth = std::min( vWidthTop, vWidthBot );
+	const int vNewOldWidthDelta = aBox2D.size.width - vNewWidth; // positive number
+	printf( "vNewWidth: %d\n", vNewWidth );
+
+	const CvPoint2D32f vNewCenter = cvPoint2D32f(
+		aBox2D.center.x + vNewOldWidthDelta * cos( aBox2D.angle ) / 2,
+		aBox2D.center.y + vNewOldWidthDelta * sin( aBox2D.angle ) / 2
+		);
+	const CvSize2D32f vNewSize = cvSize2D32f(
+		vNewWidth,
+		aBox2D.size.height
+		);
+
+	CvBox2D vBoxResized;
+	vBoxResized.center = vNewCenter;
+	vBoxResized.size = vNewSize;
+	vBoxResized.angle = aBox2D.angle; // no change
+
+	return vBoxResized;
 }
 
 void drawCvBox2D(
@@ -256,10 +340,11 @@ void drawCvBox2D(
 		aBox2D.center.y + vHeightYProj + vWidthYProj
 		);
 
-	cvLine(apImg, vTopLeft, vTopRight, cvScalar(255, 255, 255), 3);
-	cvLine(apImg, vBotLeft, vBotRight, cvScalar(255, 255, 255), 3);
-	cvLine(apImg, vTopLeft, vBotLeft, cvScalar(255, 255, 255), 3);
-	cvLine(apImg, vTopRight, vBotRight, cvScalar(255, 255, 255), 3);
+	CvScalar vColor = cvScalar(255, 0, 255);
+	cvLine(apImg, vTopLeft, vTopRight, vColor, 3);
+	cvLine(apImg, vBotLeft, vBotRight, vColor, 3);
+	cvLine(apImg, vTopLeft, vBotLeft, vColor, 3);
+	cvLine(apImg, vTopRight, vBotRight, vColor, 3);
 
 }
 

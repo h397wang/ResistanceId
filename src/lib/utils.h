@@ -6,6 +6,10 @@
 
 #include <math.h>
 
+using namespace std;
+
+#define DEBUG 1
+
 typedef struct {
     CvPoint mStart;
     CvPoint mEnd; 
@@ -25,6 +29,11 @@ void filterNoise(
 CvBox2D getResistorRoi(
     IplImage* apImg,
     const int aHoughLineAccumThresh = 65 // determined through characterization, depends on img size
+    );
+
+CvBox2D clipCvBox2DToFit( 
+    CvSize aSize,
+    CvBox2D aBox2D
     );
 
 void drawCvBox2D(
