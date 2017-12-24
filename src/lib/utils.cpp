@@ -109,21 +109,20 @@ CvBox2D getResistorRoi(
 		apImg->depth,
 		apImg->nChannels
 		);
-
+	// Noise filtering done on RGB image
 	filterNoise(apImg, vpImageFiltered);
 
+	// Line detection to be done on grayscale image
 	IplImage* vpImgFilteredGray = cvCreateImage( 
 		cvGetSize( apImg ),
 		apImg->depth,
 		1
 		);
-
 	cvCvtColor(
 		vpImageFiltered,
 		vpImgFilteredGray,
 		CV_BGR2GRAY
 		);
-
 	filterForLineDetect(
     	vpImgFilteredGray,
     	vpImgFilteredGray
@@ -184,9 +183,6 @@ CvBox2D getResistorRoi(
 	// Show dominant line
 	cvLine(apImg, vLineOfInterest.mStart, vLineOfInterest.mEnd, cvScalar(255, 255, 255));
 
-	// Add top and bottom parallel lines
-
-
 	// Clip lines to image size
 	// TODO: extract block below into function
 	// TODO: not the best idea, because of symmetrical clipping, reconsider
@@ -196,7 +192,7 @@ CvBox2D getResistorRoi(
 		);
 
 	// Create return value
-	// TODO: Bad heuristic for height value
+	// TODO: Bad heuristic for height value, hard code too
 	const float vRoiHeight = 0.3 * (float) apImg->height;
 	const float vLineLength = sqrt( 0
 		+ pow(abs(vLineOfInterest.mStart.x - vLineOfInterest.mEnd.x), 2)
@@ -204,7 +200,6 @@ CvBox2D getResistorRoi(
 		);
 	const float vLineRadFromXAxis = fmodf(vLineGroupAvgTheta, M_PI / 2);
 
-	//const float vWidthClipped = vRoiHeight / tan( vLineRadFromXAxis );
 	const float vWidthClipped = vRoiHeight * sin( vLineRadFromXAxis );
 	
 	const CvSize2D32f vRoiSize = cvSize2D32f(
@@ -212,6 +207,7 @@ CvBox2D getResistorRoi(
 		vRoiHeight
 		);
 	CvBox2D vRoi;
+	// "constructor" does not seem to exist
 	vRoi.center = vRoiCenter;
 	vRoi.size = vRoiSize;
 	vRoi.angle = vLineRadFromXAxis;
@@ -229,12 +225,7 @@ CvBox2D getResistorRoi(
 	return vRoiClipped;
 }
 
-// TODO: extract duplicated code
-CvBox2D clipCvBox2DToFit( 
-	CvSize aSize,
-	CvBox2D aBox2D
-	)
-{
+cvBox2DCorners_t getBox2dCorners( CvBox2D aBox2D ) {
 	const int vWidthXProj = aBox2D.size.width * cos( aBox2D.angle ) / 2;
 	const int vHeightYProj = aBox2D.size.height * cos( aBox2D.angle ) / 2;
 
@@ -261,32 +252,48 @@ CvBox2D clipCvBox2DToFit(
 		aBox2D.center.y + vHeightYProj + vWidthYProj
 		);
 
+	cvBox2DCorners_t vCorners;
+	vCorners.mTopLeft 	= vTopLeft;
+	vCorners.mTopRight 	= vTopRight;
+	vCorners.mBotLeft 	= vBotLeft;
+	vCorners.mBotRight 	= vBotRight;
+
+	return vCorners;
+}
+
+CvBox2D clipCvBox2DToFit( 
+	CvSize aSize,
+	CvBox2D aBox2D
+	)
+{
+	cvBox2DCorners_t vCorners = getBox2dCorners( aBox2D );
+
 	// All lines should be plottable
 	cvClipLine(
 		aSize,
-		&vTopLeft,
-		&vTopRight
+		&(vCorners.mTopLeft),
+		&(vCorners.mTopRight)
 		);
 
 	cvClipLine(
 		aSize,
-		&vBotLeft,
-		&vBotRight
+		&(vCorners.mBotLeft),
+		&(vCorners.mBotRight)
 		);
 	
 	const int vWidthTop = sqrt( 0
-		+ pow( abs( vTopLeft.x - vTopRight.x ), 2 )
-		+ pow( abs( vTopLeft.y - vTopRight.y ), 2 )
+		+ pow( abs( vCorners.mTopLeft.x - vCorners.mTopRight.x ), 2 )
+		+ pow( abs( vCorners.mTopLeft.y - vCorners.mTopRight.y ), 2 )
 		);
 
 	const int vWidthBot = sqrt( 0
-		+ pow( abs( vBotLeft.x - vBotRight.x ), 2 )
-		+ pow( abs( vBotLeft.y - vTopRight.y ), 2 )
+		+ pow( abs( vCorners.mBotLeft.x - vCorners.mBotRight.x ), 2 )
+		+ pow( abs( vCorners.mBotLeft.y - vCorners.mTopRight.y ), 2 )
 		);
 
 	const int vNewWidth = std::min( vWidthTop, vWidthBot );
 	const int vNewOldWidthDelta = aBox2D.size.width - vNewWidth; // positive number
-	printf( "vNewWidth: %d\n", vNewWidth );
+	//printf( "vNewWidth: %d\n", vNewWidth );
 
 	const CvPoint2D32f vNewCenter = cvPoint2D32f(
 		aBox2D.center.x + vNewOldWidthDelta * cos( aBox2D.angle ) / 2,
@@ -310,44 +317,72 @@ void drawCvBox2D(
 	const CvBox2D aBox2D
 	)
 {	
-
-	const int vWidthXProj = aBox2D.size.width * cos(aBox2D.angle) / 2;
-	const int vHeightYProj = aBox2D.size.height * cos(aBox2D.angle) / 2;
-
-	const int vWidthYProj = aBox2D.size.width * sin(aBox2D.angle) / 2;
-	const int vHeightXProj = aBox2D.size.height * sin(aBox2D.angle) / 2;
-
-	printf( "vWidthXProj: %d\n", vWidthXProj );
-	printf( "vHeightYProj: %d\n", vHeightYProj );
-	
-	const CvPoint vTopLeft = cvPoint(
-		aBox2D.center.x - vWidthXProj + vHeightXProj,
-		aBox2D.center.y - vHeightYProj - vWidthYProj
-		);
-
-	const CvPoint vTopRight = cvPoint(
-		aBox2D.center.x + vWidthXProj + vHeightXProj,
-		aBox2D.center.y - vHeightYProj + vWidthYProj
-		);
-
-	const CvPoint vBotLeft = cvPoint(
-		aBox2D.center.x - vWidthXProj - vHeightXProj,
-		aBox2D.center.y + vHeightYProj - vWidthYProj
-		);
-
-	const CvPoint vBotRight = cvPoint(
-		aBox2D.center.x + vWidthXProj - vHeightXProj,
-		aBox2D.center.y + vHeightYProj + vWidthYProj
-		);
+	cvBox2DCorners_t vCorners = getBox2dCorners( aBox2D );
 
 	CvScalar vColor = cvScalar(255, 0, 255);
-	cvLine(apImg, vTopLeft, vTopRight, vColor, 3);
-	cvLine(apImg, vBotLeft, vBotRight, vColor, 3);
-	cvLine(apImg, vTopLeft, vBotLeft, vColor, 3);
-	cvLine(apImg, vTopRight, vBotRight, vColor, 3);
+	cvLine(apImg, vCorners.mTopLeft, vCorners.mTopRight, vColor, 3);
+	cvLine(apImg, vCorners.mBotLeft, vCorners.mBotRight, vColor, 3);
+	cvLine(apImg, vCorners.mTopLeft, vCorners.mBotLeft, vColor, 3);
+	cvLine(apImg, vCorners.mTopRight, vCorners.mBotRight, vColor, 3);
 
 }
 
+void printArrayValues( CvMat* apMat ) {
+	printf( "printArrayValues:\n" );
+	printf( "Address: %p\n", (void*) apMat );
+    for(int row = 0; row < apMat->rows; row++ ) {
+        const float* ptr = (const float*)(apMat->data.ptr + row * apMat->step);
+        for( int col = 0; col < apMat->cols; col++ ) {
+            printf( "%.3f, ", *ptr );
+        }
+        printf("\n");
+    }
+}
+
+void printCvBox2DValues( const CvBox2D aBox2D ) {
+	printf( "center: (%f, %f)\n", aBox2D.center.x, aBox2D.center.y  );
+	printf( "width: %f\n", aBox2D.size.width );
+	printf( "height: %f\n", aBox2D.size.height );
+	printf( "angle: %f\n", aBox2D.angle );
+
+}
+
+// floats and double types only
+template< typename T >
+T getDegFromRad( T aRad ) {
+	T vDeg = aRad * 180 / M_PI;
+	return vDeg;
+}
+
+template< typename T >
+T getRadFromDeg( T aDeg ) {
+	T vDeg = aDeg * M_PI / 180;
+	return vDeg;
+}
+
+void rotateToAlignRoiAxis(
+	IplImage* apImgSrc,
+	IplImage* apImgDst,
+	const CvBox2D aBox2D
+	)
+{	
+	CvMat* vpAffineMat = cvCreateMat( 2, 3, CV_32F );
+	const double vScale = 1.0;
+	const double vRotAngleDeg = getDegFromRad( aBox2D.angle );
+	cv2DRotationMatrix(
+		aBox2D.center,
+		vRotAngleDeg,
+		vScale,
+		vpAffineMat
+	);
+	cvWarpAffine(
+		apImgSrc,
+		apImgDst,
+		vpAffineMat
+		);
+}
+
+// TODO: Use cvPolarToCart()
 lineStartEnd_t getLineFromPolar(
 	CvSize aSize,
 	float aRho,
@@ -462,7 +497,7 @@ CvSeq* getResistorContours(
 	CvMemStorage* vpStorage = cvCreateMemStorage(0);
 	CvSeq* vpContours = NULL;
 
-	IplImage* vpImgEdge = cvCreateImage( cvGetSize(apImg), 8, 1 );
+	IplImage* vpImgEdge = cvCreateImage( cvGetSize(apImg), IPL_DEPTH_8U, 1 );
 	cvCvtColor( apImg, vpImgEdge, CV_BGR2GRAY );
 	cvCanny(
 		vpImgEdge,
@@ -485,4 +520,12 @@ CvSeq* getResistorContours(
 
 	return vpContours;
 	
+}
+
+int detectResistorValue(
+	IplImage* apImg
+) {
+
+	const CvBox2D vRoiBox2D = getResistorRoi( apImg, 70 );
+	return 0;
 }

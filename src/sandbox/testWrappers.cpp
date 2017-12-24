@@ -263,8 +263,9 @@ void trackbarCallback_getResistorRoi( int aUnused ) {
         );
     cvCopy( gpImg, vpImgTmp );
     CvBox2D vRoi = getResistorRoi( vpImgTmp, gHoughLineAccumThresh );
-
     drawCvBox2D( vpImgTmp, vRoi );
+
+    rotateToAlignRoiAxis( vpImgTmp, vpImgTmp, vRoi );
 
     cvShowImage( gpWindowNameOriginal, gpImg );
     cvShowImage( gpWindowNameOutput, vpImgTmp );
@@ -296,6 +297,7 @@ int test_getResistorRoi( char* apImagePath ) {
 }
 
 
+// TODO: Move to utils, or create another file for print related functions
 // ----------------------------------------------------------------------
 // helpers
 // ----------------------------------------------------------------------

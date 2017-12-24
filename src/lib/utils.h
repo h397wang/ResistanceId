@@ -21,6 +21,13 @@ typedef struct {
     float mThetaSum;
 } lineGroup_t;
 
+typedef struct {
+    CvPoint mTopLeft;
+    CvPoint mTopRight;
+    CvPoint mBotLeft;
+    CvPoint mBotRight;
+} cvBox2DCorners_t;
+
 void filterNoise(
     IplImage* apImgSrc,
     IplImage* apImgDst
@@ -38,6 +45,22 @@ CvBox2D clipCvBox2DToFit(
 
 void drawCvBox2D(
     IplImage* apImg,
+    const CvBox2D aBox2D
+    );
+
+template< typename T >
+T getDegFromRad( T aRad );
+
+template< typename T >
+T getRadFromDeg( T aDeg );
+
+void printArrayValues( const CvMat* apMat );
+
+void printCvBox2DValues( const CvBox2D aBox2D );
+
+void rotateToAlignRoiAxis(
+    IplImage* apImgSrc,
+    IplImage* apImgDst,
     const CvBox2D aBox2D
     );
 
@@ -59,3 +82,11 @@ CvSeq* getResistorContours(
 	int aCannyThreshHigh,
 	int aContourMode
 	);
+
+int getResistorStrip(
+    IplImage* apImgSrc,
+    IplImage* apImgDst
+    );
+
+int detectResistorValue( IplImage* apImg );
+
