@@ -259,13 +259,12 @@ void trackbarCallback_getResistorRoi( int aUnused ) {
     IplImage* vpImgTmp = cvCreateImage( 
         cvSize( gpImg->width, gpImg->height ),
         gpImg->depth,
-        gpImg->nChannels
+        3
         );
     cvCopy( gpImg, vpImgTmp );
+    
     CvBox2D vRoi = getResistorRoi( vpImgTmp, gHoughLineAccumThresh );
     drawCvBox2D( vpImgTmp, vRoi );
-
-    rotateToAlignRoiAxis( vpImgTmp, vpImgTmp, vRoi );
 
     cvShowImage( gpWindowNameOriginal, gpImg );
     cvShowImage( gpWindowNameOutput, vpImgTmp );
@@ -274,6 +273,7 @@ void trackbarCallback_getResistorRoi( int aUnused ) {
 }
 
 int test_getResistorRoi( char* apImagePath ) {
+
     gpImg = cvLoadImage( apImagePath );
     if ( gpImg == NULL ) {
         printf( "Error: could not open image %s", apImagePath );
@@ -296,6 +296,44 @@ int test_getResistorRoi( char* apImagePath ) {
     return 0;
 }
 
+void trackbarCallback_detectResistorValue( int aUnused ) {
+
+    IplImage* vpImgTmp = cvCreateImage( 
+        cvSize( gpImg->width, gpImg->height ),
+        gpImg->depth,
+        3
+        );
+    cvCopy( gpImg, vpImgTmp );
+    
+    detectResistorValue( gpImg, vpImgTmp );
+
+    cvShowImage( gpWindowNameOriginal, gpImg );
+    cvShowImage( gpWindowNameOutput, vpImgTmp );
+}
+
+int test_detectResistorValue( char* apImagePath ) {
+    
+    gpImg = cvLoadImage( apImagePath );
+    if ( gpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
+
+    cvNamedWindow( gpWindowNameOriginal );
+    cvNamedWindow( gpWindowNameOutput );
+
+    cvCreateTrackbar(
+        "Placeholder",
+        gpWindowNameOutput,
+        &gHoughLineAccumThresh,
+        1,
+        trackbarCallback_detectResistorValue
+        );
+
+    trackbarCallback_detectResistorValue( 0 );
+    cvWaitKey( 0 );
+    return 0;
+}
 
 // TODO: Move to utils, or create another file for print related functions
 // ----------------------------------------------------------------------

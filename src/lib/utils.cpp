@@ -15,16 +15,17 @@ void filterNoise(
         );
     if (!vValidInput) {
         printf("Invalid args, must have same size, depth and channel.\n");
+        assert(0);
         return; 
     }
     
     // Median blur
-    int vKernelSize = 3;
+    const int vKernelSizeMedian = 3;
     cvSmooth(
         apImgSrc,
         apImgDst,
         CV_MEDIAN,
-        vKernelSize
+        vKernelSizeMedian
         );
 
     // Bilateral Gaussian cannot be done in place
@@ -34,17 +35,17 @@ void filterNoise(
         apImgSrc->nChannels
         );
 
-    vKernelSize = 5;
+    const int vKernelSizeBilat = 5;
     cvSmooth(
         apImgDst,
         vpImgFilteredBilateral, // cannot be done in place
         CV_BILATERAL,
-        vKernelSize,
-        vKernelSize
+        vKernelSizeBilat,
+        vKernelSizeBilat
         ); 
 
     // Morphological opening
-    int vNumIterations = 3;
+    const int vNumIterations = 3;
     CvArr* vpTemp = NULL;
     IplConvKernel* vpKernel = NULL;
     cvMorphologyEx(
@@ -55,6 +56,8 @@ void filterNoise(
         CV_MOP_OPEN,
         vNumIterations
     );
+
+    cvReleaseImage( &vpImgFilteredBilateral );
 }
 
 /*
@@ -96,6 +99,8 @@ void filterForLineDetect(
 		NULL,
 		vNumErosions
 		);
+
+   cvReleaseImage( &vpImgFiltered );
 }
 
 CvBox2D getResistorRoi(
@@ -154,21 +159,6 @@ CvBox2D getResistorRoi(
 		aHoughLineAccumThresh
 		);
 
-	// Show the lines that were found
-	for ( int i = 0; i < vpLines->total; i++ ) {
-		if ( vHoughMethod == CV_HOUGH_PROBABILISTIC ) {
-			CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( vpLines , i );
-			cvLine(apImg, vpPoints[0], vpPoints[1], cvScalar(0, 0, 0));
-
-		} else if ( vHoughMethod == CV_HOUGH_STANDARD ) {
-			float* vpRhoTheta = (float*) cvGetSeqElem( vpLines , i );
-			float vRho = vpRhoTheta[0];
-			float vTheta = vpRhoTheta[1];
-			lineStartEnd_t vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
-			cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
-		}	
-	}
-
 	// Get line groups
 	const lineGroup_t vLineGroupOfInterest = getLineGroupOfInterest(vpLines);
 	const float vLineGroupAvgTheta = vLineGroupOfInterest.mThetaSum / vLineGroupOfInterest.mNumLines;
@@ -181,11 +171,12 @@ CvBox2D getResistorRoi(
 		);
 
 	// Show dominant line
+	#if 0
 	cvLine(apImg, vLineOfInterest.mStart, vLineOfInterest.mEnd, cvScalar(255, 255, 255));
+	#endif
 
 	// Clip lines to image size
 	// TODO: extract block below into function
-	// TODO: not the best idea, because of symmetrical clipping, reconsider
 	const CvPoint2D32f vRoiCenter = cvPoint2D32f(
 		(vLineOfInterest.mStart.x + vLineOfInterest.mEnd.x) / 2,
 		(vLineOfInterest.mStart.y + vLineOfInterest.mEnd.y) / 2
@@ -207,7 +198,6 @@ CvBox2D getResistorRoi(
 		vRoiHeight
 		);
 	CvBox2D vRoi;
-	// "constructor" does not seem to exist
 	vRoi.center = vRoiCenter;
 	vRoi.size = vRoiSize;
 	vRoi.angle = vLineRadFromXAxis;
@@ -217,14 +207,17 @@ CvBox2D getResistorRoi(
 		vRoi
 		);
 
-#if 0
-	printf( "center: (%d, %d)\n", (int) vRoiCenter.x, (int) vRoiCenter.y );
-	printf( "size: %d x %d\n", (int) vRoiSize.width, (int) vRoiSize.height );
-	printf( "angle: %f\n", vRoi.angle );
-#endif
+	
+	{ // Clean up
+	cvReleaseImage( &vpImageFiltered );
+	cvReleaseImage( &vpImgFilteredGray );
+	cvReleaseImage( &vpImgEdges );
+	} // Clean up
+
 	return vRoiClipped;
 }
 
+// TODO: Refactor to use void cvBoxPoints() instead?
 cvBox2DCorners_t getBox2dCorners( CvBox2D aBox2D ) {
 	const int vWidthXProj = aBox2D.size.width * cos( aBox2D.angle ) / 2;
 	const int vHeightYProj = aBox2D.size.height * cos( aBox2D.angle ) / 2;
@@ -327,6 +320,27 @@ void drawCvBox2D(
 
 }
 
+void drawHoughLines(
+	IplImage* apImg,
+	CvSeq* apLines,
+	const int aHoughMethod
+	)
+{
+	for ( int i = 0; i < apLines->total; i++ ) {
+		if ( aHoughMethod == CV_HOUGH_PROBABILISTIC ) {
+			CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( apLines , i );
+			cvLine(apImg, vpPoints[0], vpPoints[1], cvScalar(0, 0, 0));
+
+		} else if ( aHoughMethod == CV_HOUGH_STANDARD ) {
+			float* vpRhoTheta = (float*) cvGetSeqElem( apLines , i );
+			float vRho = vpRhoTheta[0];
+			float vTheta = vpRhoTheta[1];
+			lineStartEnd_t vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
+			cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
+		}	
+	}
+}
+
 void printArrayValues( CvMat* apMat ) {
 	printf( "printArrayValues:\n" );
 	printf( "Address: %p\n", (void*) apMat );
@@ -345,6 +359,14 @@ void printCvBox2DValues( const CvBox2D aBox2D ) {
 	printf( "height: %f\n", aBox2D.size.height );
 	printf( "angle: %f\n", aBox2D.angle );
 
+}
+
+void printImgValues( IplImage* apImg ) {
+	printf( "apImg->roi->xOffset: %d\n", apImg->roi->xOffset );
+	printf( "apImg->roi->yOffset: %d\n", apImg->roi->yOffset );
+	printf( "apImg->depth: %d\n", apImg->depth );
+	printf( "apImg->width: %d\n", apImg->width );
+	printf( "apImg->height: %d\n", apImg->height );
 }
 
 // floats and double types only
@@ -499,19 +521,20 @@ CvSeq* getResistorContours(
 
 	IplImage* vpImgEdge = cvCreateImage( cvGetSize(apImg), IPL_DEPTH_8U, 1 );
 	cvCvtColor( apImg, vpImgEdge, CV_BGR2GRAY );
+	const int vApertureSize = 3;
 	cvCanny(
 		vpImgEdge,
 		vpImgEdge,
 		aCannyThreshLow,
 		aCannyThreshHigh,
-		3 // aperture size
+		vApertureSize
 		);
 
 	int vNumContours = cvFindContours(
 		vpImgEdge,
 		vpStorage,
 		&vpContours,
-		sizeof(CvContour), // header size
+		sizeof(CvContour),
 		aContourMode
 		);
 
@@ -519,13 +542,123 @@ CvSeq* getResistorContours(
 	cvClearMemStorage( vpStorage );
 
 	return vpContours;
+}
+
+void equalizeColorDistribution(
+	IplImage* apImgSrc,
+	IplImage* apImgDst,
+	const CvRect* apRoiRect
+	)
+{	
+	assert( apImgSrc->nChannels == 3 );
+	assert( apImgDst->nChannels == 3 );
 	
+	IplImage* vpImgYcc = cvCreateImage( 
+        cvGetSize( apImgSrc ),
+        apImgSrc->depth,
+        3
+        );
+	cvCvtColor(apImgSrc, vpImgYcc, CV_RGB2YCrCb);
+
+	IplImage* vpChannelY = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
+	IplImage* vpChannelCr = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
+	IplImage* vpChannelCb = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
+	
+	cvSplit(
+		vpImgYcc,
+		vpChannelY,
+		vpChannelCr,
+		vpChannelCb,
+		NULL
+		);
+
+	if ( apRoiRect != NULL ) {
+		cvSetImageROI( vpChannelY, *apRoiRect );
+	}
+    cvEqualizeHist( vpChannelY, vpChannelY);
+    cvResetImageROI( vpChannelY );
+
+	cvMerge(
+		vpChannelY,
+		vpChannelCr,
+		vpChannelCb,
+		NULL,
+		vpImgYcc
+		);
+
+	cvCvtColor(vpImgYcc, apImgDst, CV_YCrCb2RGB);
+
+	cvReleaseImage( &vpImgYcc );
+	cvReleaseImage( &vpChannelY );
+	cvReleaseImage( &vpChannelCr );
+	cvReleaseImage( &vpChannelCb );
+}
+
+// Input image is strictly the roi containing the resistor body
+vector<CvScalar> detectResistorBands( IplImage* apImg ) 
+{
+	vector<CvScalar> vBands = vector<CvScalar>();
+	return vBands;
 }
 
 int detectResistorValue(
-	IplImage* apImg
-) {
+	IplImage* apImg,
+	IplImage* apImgTmp // for debugging and dev
+	)
+{
 
-	const CvBox2D vRoiBox2D = getResistorRoi( apImg, 70 );
+	const CvBox2D vRoiBox2D = getResistorRoi( apImg );
+	IplImage* vpImgRotated = cvCreateImage( 
+        cvGetSize( apImg ),
+        apImg->depth,
+        apImg->nChannels
+        );
+    rotateToAlignRoiAxis( apImg, vpImgRotated, vRoiBox2D );
+
+    const CvRect vRoiRect = cvRect(
+    	vRoiBox2D.center.x - vRoiBox2D.size.width / 2,
+    	vRoiBox2D.center.y - vRoiBox2D.size.height / 2,
+    	vRoiBox2D.size.width,
+    	vRoiBox2D.size.height
+    	);
+
+    // Extract roi into its own IplImage stucture
+    IplImage* vpImgResStrip = cvCreateImage( 
+        cvSize( vRoiBox2D.size.width, vRoiBox2D.size.height ),
+        apImg->depth,
+        apImg->nChannels
+        );
+
+    cvSetImageROI( vpImgRotated, vRoiRect );
+    cvCopy( vpImgRotated, vpImgResStrip );
+	cvResetImageROI( vpImgRotated );
+
+    // Median blur cannot be done in place so create new image
+    IplImage* vpImgResStripSmoothed = cvCreateImage( 
+        cvGetSize( vpImgResStrip ),
+        vpImgResStrip->depth,
+        vpImgResStrip->nChannels
+        );
+
+    const int vKernelSize = 7;
+    cvSmooth(
+    	vpImgResStrip,
+    	vpImgResStripSmoothed,
+		CV_MEDIAN,
+		vKernelSize
+		);
+
+    equalizeColorDistribution(
+		vpImgResStripSmoothed,
+		vpImgResStripSmoothed
+		);
+
+    // TEMP: dev, ugly but works for now.
+    cvResize( vpImgResStripSmoothed, apImgTmp );
+    
+	cvReleaseImage( &vpImgRotated );
+	cvReleaseImage( &vpImgResStrip );
+	cvReleaseImage( &vpImgResStripSmoothed );
+
 	return 0;
 }

@@ -36,6 +36,9 @@ int main( int argc, char* argv[] ) {
 	case 3:
 		test_getResistorRoi( vpFilePath );
 		break;
+	case 4:
+		test_detectResistorValue( vpFilePath );
+		break;
 	default:
 		printf("Invalid option.\n");
 		break;

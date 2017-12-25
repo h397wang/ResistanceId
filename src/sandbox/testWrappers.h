@@ -15,6 +15,9 @@ int test_filterNoise( char* );
 void trackbarCallback_getResistorRoi( int );
 int test_getResistorRoi( char* );
 
+void trackbarCallback_detectResistorValue( int );
+int test_detectResistorValue( char* );
+
 // helpers
 void printSeqInfo( CvSeq* );
 void printMomentInfo( CvMoments* );

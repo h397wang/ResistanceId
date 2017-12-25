@@ -5,6 +5,7 @@
 #include "cv.hpp"
 
 #include <math.h>
+#include <assert.h>
 
 using namespace std;
 
@@ -35,7 +36,7 @@ void filterNoise(
 
 CvBox2D getResistorRoi(
     IplImage* apImg,
-    const int aHoughLineAccumThresh = 65 // determined through characterization, depends on img size
+    const int aHoughLineAccumThresh = 70 // determined through characterization, depends on img size
     );
 
 CvBox2D clipCvBox2DToFit( 
@@ -48,11 +49,19 @@ void drawCvBox2D(
     const CvBox2D aBox2D
     );
 
+void drawHoughLines(
+    IplImage* apImg,
+    CvSeq* apLines,
+    const int aHoughMethod
+    );
+
 template< typename T >
 T getDegFromRad( T aRad );
 
 template< typename T >
 T getRadFromDeg( T aDeg );
+
+void printImgValues( IplImage* apImg );
 
 void printArrayValues( const CvMat* apMat );
 
@@ -88,5 +97,17 @@ int getResistorStrip(
     IplImage* apImgDst
     );
 
-int detectResistorValue( IplImage* apImg );
+void equalizeColorDistribution(
+    IplImage* apImgSrc,
+    IplImage* apImgDst,
+    const CvRect* = NULL
+    );
+
+vector<CvScalar> detectResistorBands( IplImage* apImg );
+
+
+int detectResistorValue(
+    IplImage* apImg,
+    IplImage* apImgTmp
+    );
 
