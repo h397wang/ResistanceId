@@ -14,6 +14,9 @@ int main( int argc, char* argv[] ) {
             "1: test_haarCascade\n"
             "2: test_filterNoise\n"
             "3: test_getResistorRoi\n"
+            "4: test_detectResistorValue\n"
+            "5: test_detectVertLines\n"
+            "6: detectResistorBody\n"
             );
         return -1;
     }
@@ -38,6 +41,12 @@ int main( int argc, char* argv[] ) {
         break;
     case 4:
         test_detectResistorValue( vpFilePath );
+        break;
+    case 5:
+        test_detectVertLines( vpFilePath );
+        break;
+    case 6:
+        test_detectResistorBody( vpFilePath );
         break;
     default:
         printf("Invalid option.\n");

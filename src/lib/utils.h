@@ -49,6 +49,11 @@ void drawCvBox2D(
     const CvBox2D aBox2D
     );
 
+void drawCvRect(
+    IplImage* apImg,
+    const CvRect aRect
+    );
+
 void drawHoughLines(
     IplImage* apImg,
     CvSeq* apLines,
@@ -103,8 +108,13 @@ void equalizeColorDistribution(
     const CvRect* = NULL
     );
 
-vector<CvScalar> detectResistorBands( IplImage* apImg );
+CvRect detectResistorBody( IplImage* apImg );
 
+CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab );
+
+CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab );
+
+vector<CvScalar> detectVertLines( IplImage* apImg );
 
 int detectResistorValue(
     IplImage* apImg,

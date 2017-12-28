@@ -335,6 +335,92 @@ int test_detectResistorValue( char* apImagePath ) {
     return 0;
 }
 
+// TODO: Should be refactored, a lot of repeated code??
+void trackbarCallback_detectVertLines( int aUnused ) {
+
+    IplImage* vpImgTmp = cvCreateImage( 
+        cvSize( gpImg->width, gpImg->height ),
+        gpImg->depth,
+        3
+        );
+    cvCopy( gpImg, vpImgTmp );
+    
+    detectVertLines( vpImgTmp );
+
+    cvShowImage( gpWindowNameOriginal, gpImg );
+    cvShowImage( gpWindowNameOutput, vpImgTmp );
+}
+
+int test_detectVertLines( char* apImagePath ) {
+    
+    gpImg = cvLoadImage( apImagePath );
+    if ( gpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
+
+    cvNamedWindow( gpWindowNameOriginal );
+    cvNamedWindow( gpWindowNameOutput );
+
+    cvCreateTrackbar(
+        "Placeholder",
+        gpWindowNameOutput,
+        &gHoughLineAccumThresh,
+        1,
+        trackbarCallback_detectVertLines
+        );
+
+    trackbarCallback_detectVertLines( 0 );
+    cvWaitKey( 0 );
+    return 0;
+}
+
+void trackbarCallback_detectResistorBody( int aUnused ) {
+
+    IplImage* vpImgTmp = cvCreateImage( 
+        cvSize( gpImg->width, gpImg->height ),
+        gpImg->depth,
+        3
+        );
+    cvCopy( gpImg, vpImgTmp );
+    
+    CvRect vCvRect = detectResistorBody( vpImgTmp );
+    cvRectangle(
+        vpImgTmp,
+        cvPoint( vCvRect.x, vCvRect.y ),
+        cvPoint( vCvRect.x + vCvRect.width, vCvRect.y + vCvRect.height ),
+        cvScalar( 155, 0, 200 )
+        );
+
+    cvShowImage( gpWindowNameOriginal, gpImg );
+    cvShowImage( gpWindowNameOutput, vpImgTmp );
+}
+
+int test_detectResistorBody( char* apImagePath ) {
+    
+    gpImg = cvLoadImage( apImagePath );
+    if ( gpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
+
+    cvNamedWindow( gpWindowNameOriginal );
+    cvNamedWindow( gpWindowNameOutput );
+
+    cvCreateTrackbar(
+        "Placeholder",
+        gpWindowNameOutput,
+        &gHoughLineAccumThresh,
+        1,
+        trackbarCallback_detectResistorBody
+        );
+
+    trackbarCallback_detectResistorBody( 0 );
+    cvWaitKey( 0 );
+    return 0;
+}
+
+
 // TODO: Move to utils, or create another file for print related functions
 // ----------------------------------------------------------------------
 // helpers
@@ -345,7 +431,7 @@ void printSeqInfo( CvSeq* apSeq) {
     printf( "Number of elements in sequence: %d\n", apSeq->total );
     for( int i = 0; i < apSeq->total; ++i ) {
         CvPoint* vPoint = (CvPoint*) cvGetSeqElem( apSeq, i );
-        //printf("(%d,%d)\n", vPoint->x, vPoint->y );
+        printf("(%d,%d)\n", vPoint->x, vPoint->y );
     }
 }
 

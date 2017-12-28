@@ -18,6 +18,12 @@ int test_getResistorRoi( char* );
 void trackbarCallback_detectResistorValue( int );
 int test_detectResistorValue( char* );
 
+void trackbarCallback_detectVertLines( int );
+int test_detectVertLines( char* );
+
+void trackbarCallback_detectResistorBody( int );
+int test_detectResistorBody( char* apImagePath );
+
 // helpers
 void printSeqInfo( CvSeq* );
 void printMomentInfo( CvMoments* );

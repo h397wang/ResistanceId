@@ -69,13 +69,6 @@ void filterForLineDetect(
     IplImage* apImgDst
     )
 {
-    bool vValidInput = (1
-        && (apImgSrc->nChannels == 1)
-        && (apImgSrc->width == apImgDst->width)
-        && (apImgSrc->height == apImgDst->height)
-        && (apImgSrc->depth == apImgDst->depth)
-        && apImgSrc->nChannels == apImgDst->nChannels
-        );
 
     IplImage* vpImgFiltered = cvCreateImage( 
         cvGetSize( apImgSrc ),
@@ -336,7 +329,7 @@ void drawHoughLines(
             float vRho = vpRhoTheta[0];
             float vTheta = vpRhoTheta[1];
             lineStartEnd_t vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
-            cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
+            cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(155, 255, 0));
         }   
     }
 }
@@ -404,7 +397,6 @@ void rotateToAlignRoiAxis(
         );
 }
 
-// TODO: Use cvPolarToCart()
 lineStartEnd_t getLineFromPolar(
     CvSize aSize,
     float aRho,
@@ -415,7 +407,7 @@ lineStartEnd_t getLineFromPolar(
     float vY = aRho * sin(aTheta);
     float vLineSlope =  - (vX / vY);
     int vYInter = round( vY - vLineSlope * vX );
-    int vXinter = - round(vYInter / vLineSlope);
+    //int vXinter = - round(vYInter / vLineSlope);
     int vYRightBorderInter = vY + vLineSlope * (aSize.width - vX);
 
     CvPoint vSrtPnt = cvPoint( 0, vYInter );
@@ -443,6 +435,13 @@ lineGroup_t getLineGroupOfInterest(
     float aThetaEps
     )
 {
+
+    if ( apLines == NULL ) {
+        printf("CvSeq pointer is NULL\n");
+    }
+    if ( apLines->total == 0 ) {
+        printf("CvSeq contains no elements\n");
+    }
 
     CvMemStorage* vpStorage = cvCreateMemStorage(0);
 
@@ -530,7 +529,7 @@ CvSeq* getResistorContours(
         vApertureSize
         );
 
-    int vNumContours = cvFindContours(
+    cvFindContours(
         vpImgEdge,
         vpStorage,
         &vpContours,
@@ -594,10 +593,8 @@ void equalizeColorDistribution(
     cvReleaseImage( &vpChannelCb );
 }
 
-// Input image is strictly the roi containing the resistor body
-vector<CvScalar> detectResistorBands( IplImage* apImg ) 
-{
 
+CvRect detectResistorBody( IplImage* apImg ) {
     IplImage* vpImgLab = cvCreateImage(
         cvGetSize(apImg),
         apImg->depth,
@@ -609,14 +606,258 @@ vector<CvScalar> detectResistorBands( IplImage* apImg )
         CV_RGB2Lab
         );
 
-    const float* ptr = (const float*)(mat->data.ptr + row * mat->step);
-    for( int col = 0; col < vpImgLab->cols; col++ ) {
+    CvScalar vXBounds = detectResistorBodyHorizontalAnalysis( vpImgLab );
+    CvScalar vYBounds = detectResistorBodyVerticalAnalysis( vpImgLab );
+
+    CvRect vResistorBodyRect = cvRect(
+        vXBounds.val[0],
+        vYBounds.val[0],
+        vXBounds.val[1] - vXBounds.val[0],
+        vYBounds.val[1] - vYBounds.val[0]
+        );
+
+    return vResistorBodyRect;
+}
+
+/*
+apImgLab - image of resistor strip, must be in LAB color space
+*/
+CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab ) {
+
+    IplImage* vpChannelL = cvCreateImage( cvGetSize(apImgLab), apImgLab->depth, 1 );
+    IplImage* vpChannelA = cvCreateImage( cvGetSize(apImgLab), apImgLab->depth, 1 );
+    IplImage* vpChannelB = cvCreateImage( cvGetSize(apImgLab), apImgLab->depth, 1 );
+
+    cvSplit(
+        apImgLab,
+        vpChannelL,
+        vpChannelA,
+        vpChannelB,
+        NULL
+        );
+
+    vector<bool> vStripBelongsToRes = vector<bool>();
+    const float sigmaThresh = 7.00;
+
+    for( int col = 0; col < apImgLab->width; col++ ) {   
+        const CvRect vVertStripRoi = cvRect( col, 0, 1, apImgLab->height );
+
+        cvSetImageROI( vpChannelL, vVertStripRoi );
+        cvSetImageROI( vpChannelA, vVertStripRoi );
+        cvSetImageROI( vpChannelB, vVertStripRoi );
         
-        const CvRect vVertStripRoi = cvRect( col, 0, 1, vpImgLab->height );
+        CvScalar vMeanL = cvScalarAll(0);
+        CvScalar vStdDevL = cvScalarAll(0);             
+        CvScalar vMeanA = cvScalarAll(0);
+        CvScalar vStdDevA = cvScalarAll(0);
+        CvScalar vMeanB = cvScalarAll(0);
+        CvScalar vStdDevB = cvScalarAll(0);
+        
+        cvAvgSdv(
+            vpChannelL,
+            &vMeanL,
+            &vStdDevL
+            );
+        cvAvgSdv(
+            vpChannelA,
+            &vMeanA,
+            &vStdDevA
+            );
+        cvAvgSdv(
+            vpChannelB,
+            &vMeanB,
+            &vStdDevB
+            );
+
+        const float vColorDev = ( 0.1 * vStdDevL.val[0] )
+            + ( 0.45 * vStdDevA.val[0] )
+            + ( 0.45 * vStdDevB.val[0] );
+        
+        if ( vColorDev > sigmaThresh ) {
+            vStripBelongsToRes.push_back(true);
+        } else {
+            vStripBelongsToRes.push_back(false);
+        }
+
+        cvResetImageROI( vpChannelL );
+        cvResetImageROI( vpChannelA );
+        cvResetImageROI( vpChannelB );
     }
 
-    vector<CvScalar> vBands = vector<CvScalar>();
-    return vBands;
+    // If the distance between two marked columns is less than d0 pixels,
+    // all the columns in between are marked as belonging to the resistor.
+    const int d0 = 10;
+    for( int i = 0; i < vStripBelongsToRes.size() - d0; i++ ) {
+        if ( vStripBelongsToRes[i] && vStripBelongsToRes[i + d0] ) {
+            for ( int j = i + 1; j < i + d0; j++ ) {
+                vStripBelongsToRes[j] = true;
+            }
+        }
+    }
+
+    // Assumes a single area
+    int vLowerXBound = 0;
+    int vUpperXBound = 0;
+    for( int i = 0; i < vStripBelongsToRes.size() - 1; i++ ) {
+        if ( ! vStripBelongsToRes[i]
+            && vStripBelongsToRes[i + 1] ) {
+            vLowerXBound = i + 1;
+        } else if ( vStripBelongsToRes[i]
+            && ! vStripBelongsToRes[i + 1] ) {
+            vUpperXBound = i + 1;
+        }
+    }
+
+    CvScalar vXBounds = cvScalar( vLowerXBound, vUpperXBound, 0, 0 );
+    return vXBounds;
+}
+
+
+// TODO: might need to be refactored, lots of repeated code
+/*
+apImgLab - image of resistor strip, must be in LAB color space
+*/
+CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab ) {
+
+    IplImage* vpChannelL = cvCreateImage( cvGetSize(apImgLab), apImgLab->depth, 1 );
+    IplImage* vpChannelA = cvCreateImage( cvGetSize(apImgLab), apImgLab->depth, 1 );
+    IplImage* vpChannelB = cvCreateImage( cvGetSize(apImgLab), apImgLab->depth, 1 );
+
+    cvSplit(
+        apImgLab,
+        vpChannelL,
+        vpChannelA,
+        vpChannelB,
+        NULL
+        );
+
+    vector<bool> vStripBelongsToRes = vector<bool>();      
+    const float sigmaThresh = 7.00;
+
+    for( int row = 0; row < apImgLab->height; row++ ) {   
+        const CvRect vHoriStripRoi = cvRect( 0, row, apImgLab->width, 1 );
+
+        cvSetImageROI( vpChannelL, vHoriStripRoi );
+        cvSetImageROI( vpChannelA, vHoriStripRoi );
+        cvSetImageROI( vpChannelB, vHoriStripRoi );
+        
+        CvScalar vMeanL = cvScalarAll(0);
+        CvScalar vStdDevL = cvScalarAll(0);             
+        CvScalar vMeanA = cvScalarAll(0);
+        CvScalar vStdDevA = cvScalarAll(0);
+        CvScalar vMeanB = cvScalarAll(0);
+        CvScalar vStdDevB = cvScalarAll(0);
+        
+        cvAvgSdv(
+            vpChannelL,
+            &vMeanL,
+            &vStdDevL
+            );
+        cvAvgSdv(
+            vpChannelA,
+            &vMeanA,
+            &vStdDevA
+            );
+        cvAvgSdv(
+            vpChannelB,
+            &vMeanB,
+            &vStdDevB
+            );
+
+        const float vColorDev = ( 0.1 * vStdDevL.val[0] )
+            + ( 0.45 * vStdDevA.val[0] )
+            + ( 0.45 * vStdDevB.val[0] );
+
+        if ( vColorDev > sigmaThresh ) {
+            vStripBelongsToRes.push_back(true);
+        } else {
+            vStripBelongsToRes.push_back(false);
+        }
+
+        cvResetImageROI( vpChannelL );
+        cvResetImageROI( vpChannelA );
+        cvResetImageROI( vpChannelB );
+    }
+
+    const int d0 = 5;
+    for( int i = 0; i < vStripBelongsToRes.size() - d0; i++ ) {
+        if ( vStripBelongsToRes[i] && vStripBelongsToRes[i + d0] ) {
+            for ( int j = i + 1; j < i + d0; j++ ) {
+                vStripBelongsToRes[j] = true;
+            }
+        }
+    }
+
+    // Assumes a single area
+    int vLowerYBound = 0;
+    int vUpperYBound = 0;
+    for( int i = 0; i < vStripBelongsToRes.size() - 1; i++ ) {
+        if ( ! vStripBelongsToRes[i]
+            && vStripBelongsToRes[i + 1] ) {
+            vLowerYBound = i + 1;
+        } else if ( vStripBelongsToRes[i]
+            && ! vStripBelongsToRes[i + 1] ) {
+            vUpperYBound = i + 1;
+        }
+    }
+
+    CvScalar vYBounds = cvScalar( vLowerYBound, vUpperYBound, 0, 0 );
+    return vYBounds;
+}
+
+vector<CvScalar> detectVertLines( IplImage* apImg ) {
+
+    IplImage* vpImgGray = cvCreateImage( 
+        cvGetSize( apImg ),
+        apImg->depth,
+        1
+        );
+    cvCvtColor(
+        apImg,
+        vpImgGray,
+        CV_BGR2GRAY
+        );
+
+    const double vCannyLowThresh = 20;
+    const double vCannyUppThresh = 50; 
+    cvCanny(
+        vpImgGray,
+        vpImgGray,
+        vCannyLowThresh,
+        vCannyUppThresh
+        );
+
+    const int vNumCols = 1;
+    const int vNumRows = 7;
+    const int vAnchorX = 0;
+    const int vAnchorY = 3;
+    IplConvKernel* vpVertKernel = cvCreateStructuringElementEx(
+        vNumCols,
+        vNumRows,
+        vAnchorX,
+        vAnchorY,
+        CV_SHAPE_RECT
+        );
+
+    const int vNumIterations = 1;
+    cvMorphologyEx(
+        vpImgGray,
+        vpImgGray,
+        NULL,
+        vpVertKernel,
+        CV_MOP_OPEN,
+        vNumIterations
+    );
+
+    cvReleaseStructuringElement( &vpVertKernel );
+
+        // TEMP
+    apImg->nChannels = 1;
+    cvCopy( vpImgGray, apImg );
+
+
+    vector<CvScalar> vVertLines = vector<CvScalar>();
+    return vVertLines;  
 }
 
 int detectResistorValue(
@@ -657,7 +898,10 @@ int detectResistorValue(
         vpImgResStrip->depth,
         vpImgResStrip->nChannels
         );
-
+    cvCopy( vpImgResStrip, vpImgResStripSmoothed );
+    
+    // Not sure if this is truly neccary yet
+    /*
     const int vKernelSize = 7;
     cvSmooth(
         vpImgResStrip,
@@ -670,10 +914,12 @@ int detectResistorValue(
         vpImgResStripSmoothed,
         vpImgResStripSmoothed
         );
+    */
 
-    // TEMP: dev, ugly but works for now.
-    cvResize( vpImgResStripSmoothed, apImgTmp );
-    
+    apImgTmp->width = vRoiBox2D.size.width;
+    apImgTmp->height = vRoiBox2D.size.height;
+    cvCopy( vpImgResStripSmoothed, apImgTmp );  
+
     cvReleaseImage( &vpImgRotated );
     cvReleaseImage( &vpImgResStrip );
     cvReleaseImage( &vpImgResStripSmoothed );
