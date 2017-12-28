@@ -29,102 +29,102 @@ static CvScalar gColors[] = {
 };
 
 void trackbarCallback_getResistorContours( int aUnused ) {
-	CvSeq* vpContours = NULL;
-	CvMoments vMoments;
+    CvSeq* vpContours = NULL;
+    CvMoments vMoments;
 
-	IplImage* gpImgTmp = cvCreateImage( 
-		cvSize( gpImg->width, gpImg->height ),
-		gpImg->depth,
-		gpImg->nChannels
-		);
-	cvCopy( gpImg, gpImgTmp );
+    IplImage* gpImgTmp = cvCreateImage( 
+        cvSize( gpImg->width, gpImg->height ),
+        gpImg->depth,
+        gpImg->nChannels
+        );
+    cvCopy( gpImg, gpImgTmp );
 
-	vpContours = getResistorContours(
-		gpImgTmp,
-		gCannyThreshLow,
-		gCannyThreshHigh,
-		gContourMode
-		);
+    vpContours = getResistorContours(
+        gpImgTmp,
+        gCannyThreshLow,
+        gCannyThreshHigh,
+        gContourMode
+        );
 
-	int seqCount = 0;
-	CvSeq* vpCurrentSeq = vpContours;
+    int seqCount = 0;
+    CvSeq* vpCurrentSeq = vpContours;
 
-	while (vpCurrentSeq != NULL) {
-		if (vpCurrentSeq->total > 100) {
-			printSeqInfo(vpCurrentSeq);
+    while (vpCurrentSeq != NULL) {
+        if (vpCurrentSeq->total > 100) {
+            printSeqInfo(vpCurrentSeq);
 
-			cvMoments(
-				vpCurrentSeq,
-				&vMoments
-				);
-			printMomentInfo(&vMoments);
+            cvMoments(
+                vpCurrentSeq,
+                &vMoments
+                );
+            printMomentInfo(&vMoments);
 
-			cvDrawContours(
-				gpImgTmp,
-				vpCurrentSeq,
-				cvScalarAll(0), 	// external colour
-				cvScalarAll(155), 	// hole colour
-				0, 					// max level
-				4 					// line thickness
-				);
-		}
-		vpCurrentSeq = vpCurrentSeq->h_next;
-	}
-	seqCount++;
+            cvDrawContours(
+                gpImgTmp,
+                vpCurrentSeq,
+                cvScalarAll(0),     // external colour
+                cvScalarAll(155),   // hole colour
+                0,                  // max level
+                4                   // line thickness
+                );
+        }
+        vpCurrentSeq = vpCurrentSeq->h_next;
+    }
+    seqCount++;
 
-	cvShowImage( gpWindowNameOutput, gpImgTmp );
-	cvShowImage( gpWindowNameOriginal, gpImg );
+    cvShowImage( gpWindowNameOutput, gpImgTmp );
+    cvShowImage( gpWindowNameOriginal, gpImg );
 
-	printf("gCannyThreshLow: %d\n", gCannyThreshLow);
-	printf("gCannyThreshHigh: %d\n", gCannyThreshHigh);
-	printf("gContourMode: %d\n", gContourMode);
+    printf("gCannyThreshLow: %d\n", gCannyThreshLow);
+    printf("gCannyThreshHigh: %d\n", gCannyThreshHigh);
+    printf("gContourMode: %d\n", gContourMode);
 }
 
 int test_getResistorContours( char* apImagePath ) {
 
-	gpImg = cvLoadImage( apImagePath );
+    gpImg = cvLoadImage( apImagePath );
 
-	if ( gpImg == NULL ) {
-		printf( "Error: could not open image %s", apImagePath );
-		return -1;
-	}
+    if ( gpImg == NULL ) {
+        printf( "Error: could not open image %s", apImagePath );
+        return -1;
+    }
 
-	cvNamedWindow( gpWindowNameOutput );
-	cvNamedWindow( gpWindowNameOriginal );
-	
-	cvCreateTrackbar(
-		"Canny Threshold Low",
-		gpWindowNameOutput,
-		&gCannyThreshLow,
-		255,
-		trackbarCallback_getResistorContours
-		);
+    cvNamedWindow( gpWindowNameOutput );
+    cvNamedWindow( gpWindowNameOriginal );
+    
+    cvCreateTrackbar(
+        "Canny Threshold Low",
+        gpWindowNameOutput,
+        &gCannyThreshLow,
+        255,
+        trackbarCallback_getResistorContours
+        );
 
-	cvCreateTrackbar(
-		"Canny Threshold High",
-		gpWindowNameOutput,
-		&gCannyThreshHigh,
-		255,
-		trackbarCallback_getResistorContours
-		);
+    cvCreateTrackbar(
+        "Canny Threshold High",
+        gpWindowNameOutput,
+        &gCannyThreshHigh,
+        255,
+        trackbarCallback_getResistorContours
+        );
 
-	cvCreateTrackbar(
-		"Contour Mode",
-		gpWindowNameOutput,
-		&gContourMode,
-		3,
-		trackbarCallback_getResistorContours
-		);
+    cvCreateTrackbar(
+        "Contour Mode",
+        gpWindowNameOutput,
+        &gContourMode,
+        3,
+        trackbarCallback_getResistorContours
+        );
 
-	printf("Contour Modes:\n");
-	printf("CV_RETR_EXTERNAL\n");
-	printf("CV_RETR_LIST\n");
-	printf("CV_RETR_CCOMP\n");
-	printf("CV_RETR_TREE\n");
+    printf("Contour Modes:\n");
+    printf("CV_RETR_EXTERNAL\n");
+    printf("CV_RETR_LIST\n");
+    printf("CV_RETR_CCOMP\n");
+    printf("CV_RETR_TREE\n");
 
-	trackbarCallback_getResistorContours(0);
-	cvWaitKey(0);
-	return 0;
+    trackbarCallback_getResistorContours(0);
+    cvWaitKey(0);
+    return 0;
 }
 
 int test_haarCascade( char* apImagePath ) {
@@ -342,32 +342,32 @@ int test_detectResistorValue( char* apImagePath ) {
 
 // Assumes a sequence of CvPoint elements
 void printSeqInfo( CvSeq* apSeq) {
-	printf( "Number of elements in sequence: %d\n", apSeq->total );
-	for( int i = 0; i < apSeq->total; ++i ) {
-		CvPoint* vPoint = (CvPoint*) cvGetSeqElem( apSeq, i );
-		//printf("(%d,%d)\n", vPoint->x, vPoint->y );
-	}
+    printf( "Number of elements in sequence: %d\n", apSeq->total );
+    for( int i = 0; i < apSeq->total; ++i ) {
+        CvPoint* vPoint = (CvPoint*) cvGetSeqElem( apSeq, i );
+        //printf("(%d,%d)\n", vPoint->x, vPoint->y );
+    }
 }
 
 void printMomentInfo( CvMoments* apMoment ) {
-	/*
-	// spatial moments
-	double m00, m10, m01, m20, m11, m02, m30, m21, m12, m03;
-	// central moments
-	double mu20, mu11, mu02, mu30, mu21, mu12, mu03;
-	// m00 != 0 ? 1/sqrt(m00)
-	*/
+    /*
+    // spatial moments
+    double m00, m10, m01, m20, m11, m02, m30, m21, m12, m03;
+    // central moments
+    double mu20, mu11, mu02, mu30, mu21, mu12, mu03;
+    // m00 != 0 ? 1/sqrt(m00)
+    */
 
-	printf("Spatial Moments:\n");
-	printf("\tm00: %.2f\n", apMoment->m00);
-	printf("\tm10: %.2f\n", apMoment->m10);
-	printf("\tm01: %.2f\n", apMoment->m01);
-	printf("\tm11: %.2f\n", apMoment->m01);
+    printf("Spatial Moments:\n");
+    printf("\tm00: %.2f\n", apMoment->m00);
+    printf("\tm10: %.2f\n", apMoment->m10);
+    printf("\tm01: %.2f\n", apMoment->m01);
+    printf("\tm11: %.2f\n", apMoment->m01);
 
-	printf("Central Moments:\n");
-	printf("\tmu20: %.2f\n", apMoment->mu20);
-	printf("\tmu11: %.2f\n", apMoment->mu11);
-	printf("\tmu02: %.2f\n", apMoment->mu02);
+    printf("Central Moments:\n");
+    printf("\tmu20: %.2f\n", apMoment->mu20);
+    printf("\tmu11: %.2f\n", apMoment->mu11);
+    printf("\tmu02: %.2f\n", apMoment->mu02);
 }
 
 

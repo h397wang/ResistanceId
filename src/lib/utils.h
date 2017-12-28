@@ -86,11 +86,11 @@ lineGroup_t getLineGroupOfInterest(
     );
 
 CvSeq* getResistorContours(
-	IplImage* apImg,
-	int aCannyThreshLow,
-	int aCannyThreshHigh,
-	int aContourMode
-	);
+    IplImage* apImg,
+    int aCannyThreshLow,
+    int aCannyThreshHigh,
+    int aContourMode
+    );
 
 int getResistorStrip(
     IplImage* apImgSrc,

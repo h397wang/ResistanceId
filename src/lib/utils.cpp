@@ -61,16 +61,16 @@ void filterNoise(
 }
 
 /*
-apImgSrc	- gray scale
-apImgDst	- gray scale
+apImgSrc    - gray scale
+apImgDst    - gray scale
 */
 void filterForLineDetect(
     IplImage* apImgSrc,
     IplImage* apImgDst
     )
 {
-	bool vValidInput = (1
-		&& (apImgSrc->nChannels == 1)
+    bool vValidInput = (1
+        && (apImgSrc->nChannels == 1)
         && (apImgSrc->width == apImgDst->width)
         && (apImgSrc->height == apImgDst->height)
         && (apImgSrc->depth == apImgDst->depth)
@@ -85,265 +85,265 @@ void filterForLineDetect(
 
     const int vKernelSize = 5;
     cvSmooth(
-		apImgSrc,
-		apImgDst,
-		CV_BLUR,
-		vKernelSize,
-		vKernelSize
-		);
+        apImgSrc,
+        apImgDst,
+        CV_BLUR,
+        vKernelSize,
+        vKernelSize
+        );
 
     const int vNumErosions = 2;
     cvErode(
-		apImgDst,
-		apImgDst,
-		NULL,
-		vNumErosions
-		);
+        apImgDst,
+        apImgDst,
+        NULL,
+        vNumErosions
+        );
 
    cvReleaseImage( &vpImgFiltered );
 }
 
 CvBox2D getResistorRoi(
-	IplImage* apImg,
-	const int aHoughLineAccumThresh
-	)
+    IplImage* apImg,
+    const int aHoughLineAccumThresh
+    )
 {
-	// No change to input image, make a copy
-	IplImage* vpImageFiltered = cvCreateImage( 
-		cvGetSize( apImg ),
-		apImg->depth,
-		apImg->nChannels
-		);
-	// Noise filtering done on RGB image
-	filterNoise(apImg, vpImageFiltered);
+    // No change to input image, make a copy
+    IplImage* vpImageFiltered = cvCreateImage( 
+        cvGetSize( apImg ),
+        apImg->depth,
+        apImg->nChannels
+        );
+    // Noise filtering done on RGB image
+    filterNoise(apImg, vpImageFiltered);
 
-	// Line detection to be done on grayscale image
-	IplImage* vpImgFilteredGray = cvCreateImage( 
-		cvGetSize( apImg ),
-		apImg->depth,
-		1
-		);
-	cvCvtColor(
-		vpImageFiltered,
-		vpImgFilteredGray,
-		CV_BGR2GRAY
-		);
-	filterForLineDetect(
-    	vpImgFilteredGray,
-    	vpImgFilteredGray
-    	);
-	IplImage* vpImgEdges = cvCreateImage( 
-		cvGetSize( apImg ),
-		apImg->depth,
-		1
-		);
-	const double vCannyLowThresh = 20;
-	const double vCannyUppThresh = 60; 
+    // Line detection to be done on grayscale image
+    IplImage* vpImgFilteredGray = cvCreateImage( 
+        cvGetSize( apImg ),
+        apImg->depth,
+        1
+        );
+    cvCvtColor(
+        vpImageFiltered,
+        vpImgFilteredGray,
+        CV_BGR2GRAY
+        );
+    filterForLineDetect(
+        vpImgFilteredGray,
+        vpImgFilteredGray
+        );
+    IplImage* vpImgEdges = cvCreateImage( 
+        cvGetSize( apImg ),
+        apImg->depth,
+        1
+        );
+    const double vCannyLowThresh = 20;
+    const double vCannyUppThresh = 60; 
     cvCanny(
-		vpImgFilteredGray,
-		vpImgEdges,
-		vCannyLowThresh,
-		vCannyUppThresh
-		);
+        vpImgFilteredGray,
+        vpImgEdges,
+        vCannyLowThresh,
+        vCannyUppThresh
+        );
 
-	CvMemStorage* vpStorage = cvCreateMemStorage(0);
-	const double vRho = 1;
-	const double vTheta = 1 * M_PI / 180;
-	const int vHoughMethod = CV_HOUGH_STANDARD; //CV_HOUGH_PROBABILISTIC
-	CvSeq* vpLines = cvHoughLines2(
-		vpImgEdges,
-		vpStorage,
-		vHoughMethod,
-		vRho,	
-		vTheta,
-		aHoughLineAccumThresh
-		);
+    CvMemStorage* vpStorage = cvCreateMemStorage(0);
+    const double vRho = 1;
+    const double vTheta = 1 * M_PI / 180;
+    const int vHoughMethod = CV_HOUGH_STANDARD; //CV_HOUGH_PROBABILISTIC
+    CvSeq* vpLines = cvHoughLines2(
+        vpImgEdges,
+        vpStorage,
+        vHoughMethod,
+        vRho,   
+        vTheta,
+        aHoughLineAccumThresh
+        );
 
-	// Get line groups
-	const lineGroup_t vLineGroupOfInterest = getLineGroupOfInterest(vpLines);
-	const float vLineGroupAvgTheta = vLineGroupOfInterest.mThetaSum / vLineGroupOfInterest.mNumLines;
-	const float vLineGroupAvgRho   = vLineGroupOfInterest.mRhoSum / vLineGroupOfInterest.mNumLines;
+    // Get line groups
+    const lineGroup_t vLineGroupOfInterest = getLineGroupOfInterest(vpLines);
+    const float vLineGroupAvgTheta = vLineGroupOfInterest.mThetaSum / vLineGroupOfInterest.mNumLines;
+    const float vLineGroupAvgRho   = vLineGroupOfInterest.mRhoSum / vLineGroupOfInterest.mNumLines;
 
-	const lineStartEnd_t vLineOfInterest = getLineFromPolar(
-		cvGetSize( apImg ),
-		vLineGroupAvgRho,
-		vLineGroupAvgTheta
-		);
+    const lineStartEnd_t vLineOfInterest = getLineFromPolar(
+        cvGetSize( apImg ),
+        vLineGroupAvgRho,
+        vLineGroupAvgTheta
+        );
 
-	// Show dominant line
-	#if 0
-	cvLine(apImg, vLineOfInterest.mStart, vLineOfInterest.mEnd, cvScalar(255, 255, 255));
-	#endif
+    // Show dominant line
+    #if 0
+    cvLine(apImg, vLineOfInterest.mStart, vLineOfInterest.mEnd, cvScalar(255, 255, 255));
+    #endif
 
-	// Clip lines to image size
-	// TODO: extract block below into function
-	const CvPoint2D32f vRoiCenter = cvPoint2D32f(
-		(vLineOfInterest.mStart.x + vLineOfInterest.mEnd.x) / 2,
-		(vLineOfInterest.mStart.y + vLineOfInterest.mEnd.y) / 2
-		);
+    // Clip lines to image size
+    // TODO: extract block below into function
+    const CvPoint2D32f vRoiCenter = cvPoint2D32f(
+        (vLineOfInterest.mStart.x + vLineOfInterest.mEnd.x) / 2,
+        (vLineOfInterest.mStart.y + vLineOfInterest.mEnd.y) / 2
+        );
 
-	// Create return value
-	// TODO: Bad heuristic for height value, hard code too
-	const float vRoiHeight = 0.3 * (float) apImg->height;
-	const float vLineLength = sqrt( 0
-		+ pow(abs(vLineOfInterest.mStart.x - vLineOfInterest.mEnd.x), 2)
-		+ pow(abs(vLineOfInterest.mStart.y - vLineOfInterest.mEnd.y), 2)
-		);
-	const float vLineRadFromXAxis = fmodf(vLineGroupAvgTheta, M_PI / 2);
+    // Create return value
+    // TODO: Bad heuristic for height value, hard code too
+    const float vRoiHeight = 0.3 * (float) apImg->height;
+    const float vLineLength = sqrt( 0
+        + pow(abs(vLineOfInterest.mStart.x - vLineOfInterest.mEnd.x), 2)
+        + pow(abs(vLineOfInterest.mStart.y - vLineOfInterest.mEnd.y), 2)
+        );
+    const float vLineRadFromXAxis = fmodf(vLineGroupAvgTheta, M_PI / 2);
 
-	const float vWidthClipped = vRoiHeight * sin( vLineRadFromXAxis );
-	
-	const CvSize2D32f vRoiSize = cvSize2D32f(
-		vLineLength - vWidthClipped,
-		vRoiHeight
-		);
-	CvBox2D vRoi;
-	vRoi.center = vRoiCenter;
-	vRoi.size = vRoiSize;
-	vRoi.angle = vLineRadFromXAxis;
+    const float vWidthClipped = vRoiHeight * sin( vLineRadFromXAxis );
+    
+    const CvSize2D32f vRoiSize = cvSize2D32f(
+        vLineLength - vWidthClipped,
+        vRoiHeight
+        );
+    CvBox2D vRoi;
+    vRoi.center = vRoiCenter;
+    vRoi.size = vRoiSize;
+    vRoi.angle = vLineRadFromXAxis;
 
-	CvBox2D vRoiClipped = clipCvBox2DToFit( 
-		cvGetSize( apImg ),
-		vRoi
-		);
+    CvBox2D vRoiClipped = clipCvBox2DToFit( 
+        cvGetSize( apImg ),
+        vRoi
+        );
 
-	
-	{ // Clean up
-	cvReleaseImage( &vpImageFiltered );
-	cvReleaseImage( &vpImgFilteredGray );
-	cvReleaseImage( &vpImgEdges );
-	} // Clean up
+    
+    { // Clean up
+    cvReleaseImage( &vpImageFiltered );
+    cvReleaseImage( &vpImgFilteredGray );
+    cvReleaseImage( &vpImgEdges );
+    } // Clean up
 
-	return vRoiClipped;
+    return vRoiClipped;
 }
 
 // TODO: Refactor to use void cvBoxPoints() instead?
 cvBox2DCorners_t getBox2dCorners( CvBox2D aBox2D ) {
-	const int vWidthXProj = aBox2D.size.width * cos( aBox2D.angle ) / 2;
-	const int vHeightYProj = aBox2D.size.height * cos( aBox2D.angle ) / 2;
+    const int vWidthXProj = aBox2D.size.width * cos( aBox2D.angle ) / 2;
+    const int vHeightYProj = aBox2D.size.height * cos( aBox2D.angle ) / 2;
 
-	const int vWidthYProj = aBox2D.size.width * sin( aBox2D.angle ) / 2;
-	const int vHeightXProj = aBox2D.size.height * sin( aBox2D.angle ) / 2;
+    const int vWidthYProj = aBox2D.size.width * sin( aBox2D.angle ) / 2;
+    const int vHeightXProj = aBox2D.size.height * sin( aBox2D.angle ) / 2;
 
-	CvPoint vTopLeft = cvPoint(
-		aBox2D.center.x - vWidthXProj + vHeightXProj,
-		aBox2D.center.y - vHeightYProj - vWidthYProj
-		);
+    CvPoint vTopLeft = cvPoint(
+        aBox2D.center.x - vWidthXProj + vHeightXProj,
+        aBox2D.center.y - vHeightYProj - vWidthYProj
+        );
 
-	CvPoint vTopRight = cvPoint(
-		aBox2D.center.x + vWidthXProj + vHeightXProj,
-		aBox2D.center.y - vHeightYProj + vWidthYProj
-		);
+    CvPoint vTopRight = cvPoint(
+        aBox2D.center.x + vWidthXProj + vHeightXProj,
+        aBox2D.center.y - vHeightYProj + vWidthYProj
+        );
 
-	CvPoint vBotLeft = cvPoint(
-		aBox2D.center.x - vWidthXProj - vHeightXProj,
-		aBox2D.center.y + vHeightYProj - vWidthYProj
-		);
+    CvPoint vBotLeft = cvPoint(
+        aBox2D.center.x - vWidthXProj - vHeightXProj,
+        aBox2D.center.y + vHeightYProj - vWidthYProj
+        );
 
-	CvPoint vBotRight = cvPoint(
-		aBox2D.center.x + vWidthXProj - vHeightXProj,
-		aBox2D.center.y + vHeightYProj + vWidthYProj
-		);
+    CvPoint vBotRight = cvPoint(
+        aBox2D.center.x + vWidthXProj - vHeightXProj,
+        aBox2D.center.y + vHeightYProj + vWidthYProj
+        );
 
-	cvBox2DCorners_t vCorners;
-	vCorners.mTopLeft 	= vTopLeft;
-	vCorners.mTopRight 	= vTopRight;
-	vCorners.mBotLeft 	= vBotLeft;
-	vCorners.mBotRight 	= vBotRight;
+    cvBox2DCorners_t vCorners;
+    vCorners.mTopLeft   = vTopLeft;
+    vCorners.mTopRight  = vTopRight;
+    vCorners.mBotLeft   = vBotLeft;
+    vCorners.mBotRight  = vBotRight;
 
-	return vCorners;
+    return vCorners;
 }
 
 CvBox2D clipCvBox2DToFit( 
-	CvSize aSize,
-	CvBox2D aBox2D
-	)
+    CvSize aSize,
+    CvBox2D aBox2D
+    )
 {
-	cvBox2DCorners_t vCorners = getBox2dCorners( aBox2D );
+    cvBox2DCorners_t vCorners = getBox2dCorners( aBox2D );
 
-	// All lines should be plottable
-	cvClipLine(
-		aSize,
-		&(vCorners.mTopLeft),
-		&(vCorners.mTopRight)
-		);
+    // All lines should be plottable
+    cvClipLine(
+        aSize,
+        &(vCorners.mTopLeft),
+        &(vCorners.mTopRight)
+        );
 
-	cvClipLine(
-		aSize,
-		&(vCorners.mBotLeft),
-		&(vCorners.mBotRight)
-		);
-	
-	const int vWidthTop = sqrt( 0
-		+ pow( abs( vCorners.mTopLeft.x - vCorners.mTopRight.x ), 2 )
-		+ pow( abs( vCorners.mTopLeft.y - vCorners.mTopRight.y ), 2 )
-		);
+    cvClipLine(
+        aSize,
+        &(vCorners.mBotLeft),
+        &(vCorners.mBotRight)
+        );
+    
+    const int vWidthTop = sqrt( 0
+        + pow( abs( vCorners.mTopLeft.x - vCorners.mTopRight.x ), 2 )
+        + pow( abs( vCorners.mTopLeft.y - vCorners.mTopRight.y ), 2 )
+        );
 
-	const int vWidthBot = sqrt( 0
-		+ pow( abs( vCorners.mBotLeft.x - vCorners.mBotRight.x ), 2 )
-		+ pow( abs( vCorners.mBotLeft.y - vCorners.mTopRight.y ), 2 )
-		);
+    const int vWidthBot = sqrt( 0
+        + pow( abs( vCorners.mBotLeft.x - vCorners.mBotRight.x ), 2 )
+        + pow( abs( vCorners.mBotLeft.y - vCorners.mTopRight.y ), 2 )
+        );
 
-	const int vNewWidth = std::min( vWidthTop, vWidthBot );
-	const int vNewOldWidthDelta = aBox2D.size.width - vNewWidth; // positive number
-	//printf( "vNewWidth: %d\n", vNewWidth );
+    const int vNewWidth = std::min( vWidthTop, vWidthBot );
+    const int vNewOldWidthDelta = aBox2D.size.width - vNewWidth; // positive number
+    //printf( "vNewWidth: %d\n", vNewWidth );
 
-	const CvPoint2D32f vNewCenter = cvPoint2D32f(
-		aBox2D.center.x + vNewOldWidthDelta * cos( aBox2D.angle ) / 2,
-		aBox2D.center.y + vNewOldWidthDelta * sin( aBox2D.angle ) / 2
-		);
-	const CvSize2D32f vNewSize = cvSize2D32f(
-		vNewWidth,
-		aBox2D.size.height
-		);
+    const CvPoint2D32f vNewCenter = cvPoint2D32f(
+        aBox2D.center.x + vNewOldWidthDelta * cos( aBox2D.angle ) / 2,
+        aBox2D.center.y + vNewOldWidthDelta * sin( aBox2D.angle ) / 2
+        );
+    const CvSize2D32f vNewSize = cvSize2D32f(
+        vNewWidth,
+        aBox2D.size.height
+        );
 
-	CvBox2D vBoxResized;
-	vBoxResized.center = vNewCenter;
-	vBoxResized.size = vNewSize;
-	vBoxResized.angle = aBox2D.angle; // no change
+    CvBox2D vBoxResized;
+    vBoxResized.center = vNewCenter;
+    vBoxResized.size = vNewSize;
+    vBoxResized.angle = aBox2D.angle; // no change
 
-	return vBoxResized;
+    return vBoxResized;
 }
 
 void drawCvBox2D(
-	IplImage* apImg,
-	const CvBox2D aBox2D
-	)
-{	
-	cvBox2DCorners_t vCorners = getBox2dCorners( aBox2D );
+    IplImage* apImg,
+    const CvBox2D aBox2D
+    )
+{   
+    cvBox2DCorners_t vCorners = getBox2dCorners( aBox2D );
 
-	CvScalar vColor = cvScalar(255, 0, 255);
-	cvLine(apImg, vCorners.mTopLeft, vCorners.mTopRight, vColor, 3);
-	cvLine(apImg, vCorners.mBotLeft, vCorners.mBotRight, vColor, 3);
-	cvLine(apImg, vCorners.mTopLeft, vCorners.mBotLeft, vColor, 3);
-	cvLine(apImg, vCorners.mTopRight, vCorners.mBotRight, vColor, 3);
+    CvScalar vColor = cvScalar(255, 0, 255);
+    cvLine(apImg, vCorners.mTopLeft, vCorners.mTopRight, vColor, 3);
+    cvLine(apImg, vCorners.mBotLeft, vCorners.mBotRight, vColor, 3);
+    cvLine(apImg, vCorners.mTopLeft, vCorners.mBotLeft, vColor, 3);
+    cvLine(apImg, vCorners.mTopRight, vCorners.mBotRight, vColor, 3);
 
 }
 
 void drawHoughLines(
-	IplImage* apImg,
-	CvSeq* apLines,
-	const int aHoughMethod
-	)
+    IplImage* apImg,
+    CvSeq* apLines,
+    const int aHoughMethod
+    )
 {
-	for ( int i = 0; i < apLines->total; i++ ) {
-		if ( aHoughMethod == CV_HOUGH_PROBABILISTIC ) {
-			CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( apLines , i );
-			cvLine(apImg, vpPoints[0], vpPoints[1], cvScalar(0, 0, 0));
+    for ( int i = 0; i < apLines->total; i++ ) {
+        if ( aHoughMethod == CV_HOUGH_PROBABILISTIC ) {
+            CvPoint* vpPoints = (CvPoint*) cvGetSeqElem( apLines , i );
+            cvLine(apImg, vpPoints[0], vpPoints[1], cvScalar(0, 0, 0));
 
-		} else if ( aHoughMethod == CV_HOUGH_STANDARD ) {
-			float* vpRhoTheta = (float*) cvGetSeqElem( apLines , i );
-			float vRho = vpRhoTheta[0];
-			float vTheta = vpRhoTheta[1];
-			lineStartEnd_t vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
-			cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
-		}	
-	}
+        } else if ( aHoughMethod == CV_HOUGH_STANDARD ) {
+            float* vpRhoTheta = (float*) cvGetSeqElem( apLines , i );
+            float vRho = vpRhoTheta[0];
+            float vTheta = vpRhoTheta[1];
+            lineStartEnd_t vLine = getLineFromPolar(cvGetSize( apImg ), vRho, vTheta );
+            cvLine(apImg, vLine.mStart, vLine.mEnd, cvScalar(0, 0, 0));
+        }   
+    }
 }
 
 void printArrayValues( CvMat* apMat ) {
-	printf( "printArrayValues:\n" );
-	printf( "Address: %p\n", (void*) apMat );
+    printf( "printArrayValues:\n" );
+    printf( "Address: %p\n", (void*) apMat );
     for(int row = 0; row < apMat->rows; row++ ) {
         const float* ptr = (const float*)(apMat->data.ptr + row * apMat->step);
         for( int col = 0; col < apMat->cols; col++ ) {
@@ -354,87 +354,87 @@ void printArrayValues( CvMat* apMat ) {
 }
 
 void printCvBox2DValues( const CvBox2D aBox2D ) {
-	printf( "center: (%f, %f)\n", aBox2D.center.x, aBox2D.center.y  );
-	printf( "width: %f\n", aBox2D.size.width );
-	printf( "height: %f\n", aBox2D.size.height );
-	printf( "angle: %f\n", aBox2D.angle );
+    printf( "center: (%f, %f)\n", aBox2D.center.x, aBox2D.center.y  );
+    printf( "width: %f\n", aBox2D.size.width );
+    printf( "height: %f\n", aBox2D.size.height );
+    printf( "angle: %f\n", aBox2D.angle );
 
 }
 
 void printImgValues( IplImage* apImg ) {
-	printf( "apImg->roi->xOffset: %d\n", apImg->roi->xOffset );
-	printf( "apImg->roi->yOffset: %d\n", apImg->roi->yOffset );
-	printf( "apImg->depth: %d\n", apImg->depth );
-	printf( "apImg->width: %d\n", apImg->width );
-	printf( "apImg->height: %d\n", apImg->height );
+    printf( "apImg->roi->xOffset: %d\n", apImg->roi->xOffset );
+    printf( "apImg->roi->yOffset: %d\n", apImg->roi->yOffset );
+    printf( "apImg->depth: %d\n", apImg->depth );
+    printf( "apImg->width: %d\n", apImg->width );
+    printf( "apImg->height: %d\n", apImg->height );
 }
 
 // floats and double types only
 template< typename T >
 T getDegFromRad( T aRad ) {
-	T vDeg = aRad * 180 / M_PI;
-	return vDeg;
+    T vDeg = aRad * 180 / M_PI;
+    return vDeg;
 }
 
 template< typename T >
 T getRadFromDeg( T aDeg ) {
-	T vDeg = aDeg * M_PI / 180;
-	return vDeg;
+    T vDeg = aDeg * M_PI / 180;
+    return vDeg;
 }
 
 void rotateToAlignRoiAxis(
-	IplImage* apImgSrc,
-	IplImage* apImgDst,
-	const CvBox2D aBox2D
-	)
-{	
-	CvMat* vpAffineMat = cvCreateMat( 2, 3, CV_32F );
-	const double vScale = 1.0;
-	const double vRotAngleDeg = getDegFromRad( aBox2D.angle );
-	cv2DRotationMatrix(
-		aBox2D.center,
-		vRotAngleDeg,
-		vScale,
-		vpAffineMat
-	);
-	cvWarpAffine(
-		apImgSrc,
-		apImgDst,
-		vpAffineMat
-		);
+    IplImage* apImgSrc,
+    IplImage* apImgDst,
+    const CvBox2D aBox2D
+    )
+{   
+    CvMat* vpAffineMat = cvCreateMat( 2, 3, CV_32F );
+    const double vScale = 1.0;
+    const double vRotAngleDeg = getDegFromRad( aBox2D.angle );
+    cv2DRotationMatrix(
+        aBox2D.center,
+        vRotAngleDeg,
+        vScale,
+        vpAffineMat
+    );
+    cvWarpAffine(
+        apImgSrc,
+        apImgDst,
+        vpAffineMat
+        );
 }
 
 // TODO: Use cvPolarToCart()
 lineStartEnd_t getLineFromPolar(
-	CvSize aSize,
-	float aRho,
-	float aTheta
-	)
+    CvSize aSize,
+    float aRho,
+    float aTheta
+    )
 {
-	float vX = aRho * cos(aTheta);
-	float vY = aRho * sin(aTheta);
-	float vLineSlope =  - (vX / vY);
-	int vYInter = round( vY - vLineSlope * vX );
-	int vXinter = - round(vYInter / vLineSlope);
-	int vYRightBorderInter = vY + vLineSlope * (aSize.width - vX);
+    float vX = aRho * cos(aTheta);
+    float vY = aRho * sin(aTheta);
+    float vLineSlope =  - (vX / vY);
+    int vYInter = round( vY - vLineSlope * vX );
+    int vXinter = - round(vYInter / vLineSlope);
+    int vYRightBorderInter = vY + vLineSlope * (aSize.width - vX);
 
-	CvPoint vSrtPnt = cvPoint( 0, vYInter );
-	CvPoint vEndPnt = cvPoint( aSize.width, vYRightBorderInter );
+    CvPoint vSrtPnt = cvPoint( 0, vYInter );
+    CvPoint vEndPnt = cvPoint( aSize.width, vYRightBorderInter );
 
-	bool vIsPlottable = cvClipLine(
-		aSize,
-		&vSrtPnt,
-		&vEndPnt
-		);
+    bool vIsPlottable = cvClipLine(
+        aSize,
+        &vSrtPnt,
+        &vEndPnt
+        );
 
-	lineStartEnd_t vLine;
+    lineStartEnd_t vLine;
 
-	if (vIsPlottable) {
-		vLine.mStart = vSrtPnt;
-		vLine.mEnd = vEndPnt;		
-	}
+    if (vIsPlottable) {
+        vLine.mStart = vSrtPnt;
+        vLine.mEnd = vEndPnt;       
+    }
 
-	return vLine;
+    return vLine;
 }
 
 lineGroup_t getLineGroupOfInterest(
@@ -444,171 +444,189 @@ lineGroup_t getLineGroupOfInterest(
     )
 {
 
-	CvMemStorage* vpStorage = cvCreateMemStorage(0);
+    CvMemStorage* vpStorage = cvCreateMemStorage(0);
 
-	// Create linked list of line groups
-	CvSeq* vpLineGroups = cvCreateSeq(
-		0,
-		sizeof(CvSeq),
-		sizeof(lineGroup_t),
-		vpStorage
-	);
+    // Create linked list of line groups
+    CvSeq* vpLineGroups = cvCreateSeq(
+        0,
+        sizeof(CvSeq),
+        sizeof(lineGroup_t),
+        vpStorage
+    );
 
-	float* vpRhoTheta = (float*) cvGetSeqElem( apLines , 0 );
-	float vRho = vpRhoTheta[0];
-	float vTheta = vpRhoTheta[1];
+    float* vpRhoTheta = (float*) cvGetSeqElem( apLines , 0 );
+    float vRho = vpRhoTheta[0];
+    float vTheta = vpRhoTheta[1];
 
-	lineGroup_t vFirstLineGroup = { 1, vRho, vTheta };
+    lineGroup_t vFirstLineGroup = { 1, vRho, vTheta };
 
-	// Add the first line group
-	cvSeqPush(
-		vpLineGroups,		
-		&vFirstLineGroup
-	);
+    // Add the first line group
+    cvSeqPush(
+        vpLineGroups,       
+        &vFirstLineGroup
+    );
 
-	// Go through the rest of the lines
-	for ( int i = 1; i < apLines->total; i++ ) {
-		vpRhoTheta = (float*) cvGetSeqElem( apLines , i );
-		vRho = vpRhoTheta[0];
-		vTheta = vpRhoTheta[1];
+    // Go through the rest of the lines
+    for ( int i = 1; i < apLines->total; i++ ) {
+        vpRhoTheta = (float*) cvGetSeqElem( apLines , i );
+        vRho = vpRhoTheta[0];
+        vTheta = vpRhoTheta[1];
 
-		// Check against each line group
-		for ( int j = 0; j < vpLineGroups->total; j++ ) {
-			lineGroup_t* vpCurrentLineGroup = (lineGroup_t*) cvGetSeqElem( vpLineGroups , j );
-			float vRhoAvg = vpCurrentLineGroup->mRhoSum / vpCurrentLineGroup->mNumLines;
-			float vThetaAvg = vpCurrentLineGroup->mThetaSum / vpCurrentLineGroup->mNumLines;
-			
-			if ( 1
-				&& ( abs(vRho - vRhoAvg) < aRhoEps ) 
-				&& ( abs(vTheta - vThetaAvg) < aThetaEps ) ) {
-				// Add to the current line group
-				vpCurrentLineGroup->mRhoSum += vRho;
-				vpCurrentLineGroup->mThetaSum += vTheta;
-				vpCurrentLineGroup->mNumLines++;
-			} else {
-				// Make a new line group
+        // Check against each line group
+        for ( int j = 0; j < vpLineGroups->total; j++ ) {
+            lineGroup_t* vpCurrentLineGroup = (lineGroup_t*) cvGetSeqElem( vpLineGroups , j );
+            float vRhoAvg = vpCurrentLineGroup->mRhoSum / vpCurrentLineGroup->mNumLines;
+            float vThetaAvg = vpCurrentLineGroup->mThetaSum / vpCurrentLineGroup->mNumLines;
+            
+            if ( 1
+                && ( abs(vRho - vRhoAvg) < aRhoEps ) 
+                && ( abs(vTheta - vThetaAvg) < aThetaEps ) ) {
+                // Add to the current line group
+                vpCurrentLineGroup->mRhoSum += vRho;
+                vpCurrentLineGroup->mThetaSum += vTheta;
+                vpCurrentLineGroup->mNumLines++;
+            } else {
+                // Make a new line group
 
-				lineGroup_t vNewLineGroup = { 1, vRho, vTheta };
-				cvSeqPush( vpLineGroups, &vNewLineGroup );
-			}
-		}
-	}
+                lineGroup_t vNewLineGroup = { 1, vRho, vTheta };
+                cvSeqPush( vpLineGroups, &vNewLineGroup );
+            }
+        }
+    }
 
-	// Get the line group to be returned
-	lineGroup_t vLineGroupToRet =  * ((lineGroup_t*) cvGetSeqElem( vpLineGroups , 0 ) );
-	for ( int i = 1; i < vpLineGroups->total; i++ ) {
-		lineGroup_t* vpCurrentLineGroup = (lineGroup_t*) cvGetSeqElem( vpLineGroups , i );
-		if ( vpCurrentLineGroup->mNumLines > vLineGroupToRet.mNumLines ) {
-			vLineGroupToRet = * vpCurrentLineGroup;
-		}
-	}
+    // Get the line group to be returned
+    lineGroup_t vLineGroupToRet =  * ((lineGroup_t*) cvGetSeqElem( vpLineGroups , 0 ) );
+    for ( int i = 1; i < vpLineGroups->total; i++ ) {
+        lineGroup_t* vpCurrentLineGroup = (lineGroup_t*) cvGetSeqElem( vpLineGroups , i );
+        if ( vpCurrentLineGroup->mNumLines > vLineGroupToRet.mNumLines ) {
+            vLineGroupToRet = * vpCurrentLineGroup;
+        }
+    }
 
-	cvReleaseMemStorage( &vpStorage );
+    cvReleaseMemStorage( &vpStorage );
 
-	return vLineGroupToRet; 
+    return vLineGroupToRet; 
 }
 
 CvSeq* getResistorContours(
-	IplImage* apImg,
-	int aCannyThreshLow,
-	int aCannyThreshHigh,
-	int aContourMode
-	) 
+    IplImage* apImg,
+    int aCannyThreshLow,
+    int aCannyThreshHigh,
+    int aContourMode
+    ) 
 {
 
-	CvMemStorage* vpStorage = cvCreateMemStorage(0);
-	CvSeq* vpContours = NULL;
+    CvMemStorage* vpStorage = cvCreateMemStorage(0);
+    CvSeq* vpContours = NULL;
 
-	IplImage* vpImgEdge = cvCreateImage( cvGetSize(apImg), IPL_DEPTH_8U, 1 );
-	cvCvtColor( apImg, vpImgEdge, CV_BGR2GRAY );
-	const int vApertureSize = 3;
-	cvCanny(
-		vpImgEdge,
-		vpImgEdge,
-		aCannyThreshLow,
-		aCannyThreshHigh,
-		vApertureSize
-		);
+    IplImage* vpImgEdge = cvCreateImage( cvGetSize(apImg), IPL_DEPTH_8U, 1 );
+    cvCvtColor( apImg, vpImgEdge, CV_BGR2GRAY );
+    const int vApertureSize = 3;
+    cvCanny(
+        vpImgEdge,
+        vpImgEdge,
+        aCannyThreshLow,
+        aCannyThreshHigh,
+        vApertureSize
+        );
 
-	int vNumContours = cvFindContours(
-		vpImgEdge,
-		vpStorage,
-		&vpContours,
-		sizeof(CvContour),
-		aContourMode
-		);
+    int vNumContours = cvFindContours(
+        vpImgEdge,
+        vpStorage,
+        &vpContours,
+        sizeof(CvContour),
+        aContourMode
+        );
 
-	// Clean up
-	cvClearMemStorage( vpStorage );
+    // Clean up
+    cvClearMemStorage( vpStorage );
 
-	return vpContours;
+    return vpContours;
 }
 
 void equalizeColorDistribution(
-	IplImage* apImgSrc,
-	IplImage* apImgDst,
-	const CvRect* apRoiRect
-	)
-{	
-	assert( apImgSrc->nChannels == 3 );
-	assert( apImgDst->nChannels == 3 );
-	
-	IplImage* vpImgYcc = cvCreateImage( 
+    IplImage* apImgSrc,
+    IplImage* apImgDst,
+    const CvRect* apRoiRect
+    )
+{   
+    assert( apImgSrc->nChannels == 3 );
+    assert( apImgDst->nChannels == 3 );
+    
+    IplImage* vpImgYcc = cvCreateImage( 
         cvGetSize( apImgSrc ),
         apImgSrc->depth,
         3
         );
-	cvCvtColor(apImgSrc, vpImgYcc, CV_RGB2YCrCb);
+    cvCvtColor(apImgSrc, vpImgYcc, CV_RGB2YCrCb);
 
-	IplImage* vpChannelY = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
-	IplImage* vpChannelCr = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
-	IplImage* vpChannelCb = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
-	
-	cvSplit(
-		vpImgYcc,
-		vpChannelY,
-		vpChannelCr,
-		vpChannelCb,
-		NULL
-		);
+    IplImage* vpChannelY = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
+    IplImage* vpChannelCr = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
+    IplImage* vpChannelCb = cvCreateImage( cvGetSize(apImgSrc), apImgSrc->depth, 1 );
+    
+    cvSplit(
+        vpImgYcc,
+        vpChannelY,
+        vpChannelCr,
+        vpChannelCb,
+        NULL
+        );
 
-	if ( apRoiRect != NULL ) {
-		cvSetImageROI( vpChannelY, *apRoiRect );
-	}
+    if ( apRoiRect != NULL ) {
+        cvSetImageROI( vpChannelY, *apRoiRect );
+    }
     cvEqualizeHist( vpChannelY, vpChannelY);
     cvResetImageROI( vpChannelY );
 
-	cvMerge(
-		vpChannelY,
-		vpChannelCr,
-		vpChannelCb,
-		NULL,
-		vpImgYcc
-		);
+    cvMerge(
+        vpChannelY,
+        vpChannelCr,
+        vpChannelCb,
+        NULL,
+        vpImgYcc
+        );
 
-	cvCvtColor(vpImgYcc, apImgDst, CV_YCrCb2RGB);
+    cvCvtColor(vpImgYcc, apImgDst, CV_YCrCb2RGB);
 
-	cvReleaseImage( &vpImgYcc );
-	cvReleaseImage( &vpChannelY );
-	cvReleaseImage( &vpChannelCr );
-	cvReleaseImage( &vpChannelCb );
+    cvReleaseImage( &vpImgYcc );
+    cvReleaseImage( &vpChannelY );
+    cvReleaseImage( &vpChannelCr );
+    cvReleaseImage( &vpChannelCb );
 }
 
 // Input image is strictly the roi containing the resistor body
 vector<CvScalar> detectResistorBands( IplImage* apImg ) 
 {
-	vector<CvScalar> vBands = vector<CvScalar>();
-	return vBands;
+
+    IplImage* vpImgLab = cvCreateImage(
+        cvGetSize(apImg),
+        apImg->depth,
+        3
+        );
+    cvCvtColor(
+        apImg,
+        vpImgLab,
+        CV_RGB2Lab
+        );
+
+    const float* ptr = (const float*)(mat->data.ptr + row * mat->step);
+    for( int col = 0; col < vpImgLab->cols; col++ ) {
+        
+        const CvRect vVertStripRoi = cvRect( col, 0, 1, vpImgLab->height );
+    }
+
+    vector<CvScalar> vBands = vector<CvScalar>();
+    return vBands;
 }
 
 int detectResistorValue(
-	IplImage* apImg,
-	IplImage* apImgTmp // for debugging and dev
-	)
+    IplImage* apImg,
+    IplImage* apImgTmp // for debugging and dev
+    )
 {
 
-	const CvBox2D vRoiBox2D = getResistorRoi( apImg );
-	IplImage* vpImgRotated = cvCreateImage( 
+    const CvBox2D vRoiBox2D = getResistorRoi( apImg );
+    IplImage* vpImgRotated = cvCreateImage( 
         cvGetSize( apImg ),
         apImg->depth,
         apImg->nChannels
@@ -616,11 +634,11 @@ int detectResistorValue(
     rotateToAlignRoiAxis( apImg, vpImgRotated, vRoiBox2D );
 
     const CvRect vRoiRect = cvRect(
-    	vRoiBox2D.center.x - vRoiBox2D.size.width / 2,
-    	vRoiBox2D.center.y - vRoiBox2D.size.height / 2,
-    	vRoiBox2D.size.width,
-    	vRoiBox2D.size.height
-    	);
+        vRoiBox2D.center.x - vRoiBox2D.size.width / 2,
+        vRoiBox2D.center.y - vRoiBox2D.size.height / 2,
+        vRoiBox2D.size.width,
+        vRoiBox2D.size.height
+        );
 
     // Extract roi into its own IplImage stucture
     IplImage* vpImgResStrip = cvCreateImage( 
@@ -631,7 +649,7 @@ int detectResistorValue(
 
     cvSetImageROI( vpImgRotated, vRoiRect );
     cvCopy( vpImgRotated, vpImgResStrip );
-	cvResetImageROI( vpImgRotated );
+    cvResetImageROI( vpImgRotated );
 
     // Median blur cannot be done in place so create new image
     IplImage* vpImgResStripSmoothed = cvCreateImage( 
@@ -642,23 +660,23 @@ int detectResistorValue(
 
     const int vKernelSize = 7;
     cvSmooth(
-    	vpImgResStrip,
-    	vpImgResStripSmoothed,
-		CV_MEDIAN,
-		vKernelSize
-		);
+        vpImgResStrip,
+        vpImgResStripSmoothed,
+        CV_MEDIAN,
+        vKernelSize
+        );
 
     equalizeColorDistribution(
-		vpImgResStripSmoothed,
-		vpImgResStripSmoothed
-		);
+        vpImgResStripSmoothed,
+        vpImgResStripSmoothed
+        );
 
     // TEMP: dev, ugly but works for now.
     cvResize( vpImgResStripSmoothed, apImgTmp );
     
-	cvReleaseImage( &vpImgRotated );
-	cvReleaseImage( &vpImgResStrip );
-	cvReleaseImage( &vpImgResStripSmoothed );
+    cvReleaseImage( &vpImgRotated );
+    cvReleaseImage( &vpImgResStrip );
+    cvReleaseImage( &vpImgResStripSmoothed );
 
-	return 0;
+    return 0;
 }
