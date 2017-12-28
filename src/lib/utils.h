@@ -104,8 +104,7 @@ int getResistorStrip(
 
 void equalizeColorDistribution(
     IplImage* apImgSrc,
-    IplImage* apImgDst,
-    const CvRect* = NULL
+    IplImage* apImgDst
     );
 
 CvRect detectResistorBody( IplImage* apImg );

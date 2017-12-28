@@ -429,6 +429,15 @@ lineStartEnd_t getLineFromPolar(
     return vLine;
 }
 
+/*
+Brief: 
+Input:
+    CvSeq* apLines - lines returned by hough transform 
+    float aRhoEps - max difference in rho value for line to be considered part of line group
+    float aThetaEps - max difference in theta value for line to be considered part of line group
+Output:
+    lineGroup_t vLineGroupToRet - line group that best represents the "direction" of the resistor strip
+*/
 lineGroup_t getLineGroupOfInterest(
     CvSeq* apLines,
     float aRhoEps,
@@ -486,7 +495,6 @@ lineGroup_t getLineGroupOfInterest(
                 vpCurrentLineGroup->mNumLines++;
             } else {
                 // Make a new line group
-
                 lineGroup_t vNewLineGroup = { 1, vRho, vTheta };
                 cvSeqPush( vpLineGroups, &vNewLineGroup );
             }
@@ -507,6 +515,8 @@ lineGroup_t getLineGroupOfInterest(
     return vLineGroupToRet; 
 }
 
+
+// Unused
 CvSeq* getResistorContours(
     IplImage* apImg,
     int aCannyThreshLow,
@@ -543,10 +553,16 @@ CvSeq* getResistorContours(
     return vpContours;
 }
 
+/*
+Brief: convert input image to YCC color space and equalize the Y channel
+Input:
+    IplImage* apImgSrc - 
+Output:
+    IplImage* apImgDst -  
+*/
 void equalizeColorDistribution(
     IplImage* apImgSrc,
-    IplImage* apImgDst,
-    const CvRect* apRoiRect
+    IplImage* apImgDst
     )
 {   
     assert( apImgSrc->nChannels == 3 );
@@ -571,11 +587,7 @@ void equalizeColorDistribution(
         NULL
         );
 
-    if ( apRoiRect != NULL ) {
-        cvSetImageROI( vpChannelY, *apRoiRect );
-    }
     cvEqualizeHist( vpChannelY, vpChannelY);
-    cvResetImageROI( vpChannelY );
 
     cvMerge(
         vpChannelY,
@@ -593,7 +605,13 @@ void equalizeColorDistribution(
     cvReleaseImage( &vpChannelCb );
 }
 
-
+/*
+Brief: locate roi containing resistor body from the resistor strip
+Input:
+    IplImage* apImg - cropped image containing resistor strip 
+Output:
+    CvRect vResistorBodyRect - describes bounds containign resistor body 
+*/
 CvRect detectResistorBody( IplImage* apImg ) {
     IplImage* vpImgLab = cvCreateImage(
         cvGetSize(apImg),
@@ -620,7 +638,11 @@ CvRect detectResistorBody( IplImage* apImg ) {
 }
 
 /*
-apImgLab - image of resistor strip, must be in LAB color space
+Brief: Horizontal analysis of resistor strip to locate x bounds of resistor body
+Input:
+    IplImage* apImg - cropped image containing resistor strip 
+Output:
+    vector<CvScalar> vXBounds - 2-tuple containing upper and lower x coordinates 
 */
 CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab ) {
 
@@ -713,9 +735,12 @@ CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab ) {
 }
 
 
-// TODO: might need to be refactored, lots of repeated code
 /*
-apImgLab - image of resistor strip, must be in LAB color space
+Brief: Vertical analysis of resistor strip to locate y bounds of resistor body
+Input:
+    IplImage* apImg - cropped image containing resistor strip 
+Output:
+    vector<CvScalar> vYBounds - 2-tuple containing upper and lower y coordinates 
 */
 CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab ) {
 
@@ -805,6 +830,13 @@ CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab ) {
     return vYBounds;
 }
 
+/*
+Brief: 
+Input:
+    IplImage* apImg - cropped image containing only resistor body 
+Output:
+    vector<CvScalar> vVertLines - 
+*/
 vector<CvScalar> detectVertLines( IplImage* apImg ) {
 
     IplImage* vpImgGray = cvCreateImage( 
@@ -851,18 +883,24 @@ vector<CvScalar> detectVertLines( IplImage* apImg ) {
 
     cvReleaseStructuringElement( &vpVertKernel );
 
-        // TEMP
+    // TEMP
     apImg->nChannels = 1;
     cvCopy( vpImgGray, apImg );
-
 
     vector<CvScalar> vVertLines = vector<CvScalar>();
     return vVertLines;  
 }
 
+/*
+Brief: Highest level function 
+Input:
+    IplImage* apImg - original image containing a resistor 
+Output:
+    int vResistorValue - resistance of resistor (Ohms)
+*/
 int detectResistorValue(
     IplImage* apImg,
-    IplImage* apImgTmp // for debugging and dev
+    IplImage* apImgTmp // TEMP: for debugging and dev
     )
 {
 
@@ -901,7 +939,7 @@ int detectResistorValue(
     cvCopy( vpImgResStrip, vpImgResStripSmoothed );
     
     // Not sure if this is truly neccary yet
-    /*
+    #if 0
     const int vKernelSize = 7;
     cvSmooth(
         vpImgResStrip,
@@ -914,7 +952,7 @@ int detectResistorValue(
         vpImgResStripSmoothed,
         vpImgResStripSmoothed
         );
-    */
+    #endif
 
     apImgTmp->width = vRoiBox2D.size.width;
     apImgTmp->height = vRoiBox2D.size.height;
