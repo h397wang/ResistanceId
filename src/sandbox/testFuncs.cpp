@@ -16,7 +16,7 @@ int main( int argc, char* argv[] ) {
             "3: test_getResistorRoi\n"
             "4: test_detectResistorValue\n"
             "5: test_detectVertLines\n"
-            "6: detectResistorBody\n"
+            "6: test_detectResistorBody\n"
             );
         return -1;
     }

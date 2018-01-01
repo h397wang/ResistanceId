@@ -279,7 +279,6 @@ CvBox2D clipCvBox2DToFit(
 
     const int vNewWidth = std::min( vWidthTop, vWidthBot );
     const int vNewOldWidthDelta = aBox2D.size.width - vNewWidth; // positive number
-    //printf( "vNewWidth: %d\n", vNewWidth );
 
     const CvPoint2D32f vNewCenter = cvPoint2D32f(
         aBox2D.center.x + vNewOldWidthDelta * cos( aBox2D.angle ) / 2,
@@ -833,62 +832,122 @@ CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab ) {
 /*
 Brief: 
 Input:
-    IplImage* apImg - cropped image containing only resistor body 
+    IplImage* apImg - cropped image containing only reduced resistor body, lab color space
 Output:
     vector<CvScalar> vVertLines - 
 */
-vector<CvScalar> detectVertLines( IplImage* apImg ) {
+vector<int> detectVertLines( IplImage* apImg ) {
 
-    IplImage* vpImgGray = cvCreateImage( 
+    IplImage* vpImgLab = cvCreateImage( 
         cvGetSize( apImg ),
         apImg->depth,
-        1
+        apImg->nChannels
         );
+
     cvCvtColor(
         apImg,
-        vpImgGray,
-        CV_BGR2GRAY
+        vpImgLab,
+        CV_RGB2Lab
         );
 
-    const double vCannyLowThresh = 20;
-    const double vCannyUppThresh = 50; 
-    cvCanny(
-        vpImgGray,
-        vpImgGray,
-        vCannyLowThresh,
-        vCannyUppThresh
+    IplImage* vpMeanColColors = cvCreateImage( 
+        cvSize( apImg->width, 1 ),
+        apImg->depth,
+        apImg->nChannels
         );
 
-    const int vNumCols = 1;
-    const int vNumRows = 7;
-    const int vAnchorX = 0;
-    const int vAnchorY = 3;
-    IplConvKernel* vpVertKernel = cvCreateStructuringElementEx(
-        vNumCols,
-        vNumRows,
-        vAnchorX,
-        vAnchorY,
-        CV_SHAPE_RECT
+    for(int col = 0; col < vpImgLab->width; col++) {
+        const CvRect vVertStrip = cvRect( col, 0, 1, vpImgLab->height );
+        cvSetImageROI( vpImgLab, vVertStrip );
+        const CvScalar vMeanColor = cvAvg( vpImgLab );
+        cvResetImageROI( vpImgLab );
+
+        printf("Mean Color %.2f, %.2f, %.2f \n", vMeanColor.val[0], vMeanColor.val[1], vMeanColor.val[2]);
+        cvSet2D( vpMeanColColors, 0, col, vMeanColor );
+    }
+
+    const int vNumPrevColsToCmp = apImg->width / 25;
+
+    vector<int> vVertLineXCoords = vector<int>();
+
+    for(int i = vNumPrevColsToCmp; i < apImg->width; i++) {
+
+        const CvRect vPrevColsRect = cvRect(
+            i - vNumPrevColsToCmp,
+            0,
+            vNumPrevColsToCmp,
+            apImg->height
+            );
+        cvSetImageROI( vpMeanColColors, vPrevColsRect );
+        const CvScalar vMeanColor = cvAvg( vpMeanColColors );
+        printf("Mean Color of prev block: %.2f, %.2f, %.2f \n", vMeanColor.val[0], vMeanColor.val[1], vMeanColor.val[2]);
+
+        cvResetImageROI( vpMeanColColors );
+
+        const CvScalar vCurrentColor = cvGet2D( vpMeanColColors, 0, i );
+        float vColorDistance = calcLabColorDistance( vCurrentColor,  vMeanColor );
+        printf("color distance: %.2f\n", vColorDistance);
+        const float vColorDistThresh = 9.0;
+        if ( (vVertLineXCoords.size() == 0 )
+            || ( ( vColorDistance > vColorDistThresh )
+            && ( i - vVertLineXCoords.back() > vNumPrevColsToCmp ) )
+            ) {
+            vVertLineXCoords.push_back(i);
+        }
+    }
+    return vVertLineXCoords;
+}
+
+/*
+Brief: 
+Input:
+    CvScalar vColor1 - 
+    CvScalar vColor2 -    
+Output:
+    int vResistorValue - resistance of resistor (Ohms)
+*/
+float calcLabColorDistance(
+    CvScalar vColor1,
+    CvScalar vColor2
+    )
+{
+
+    //const float k_L = 1;
+    //const float k_C = 1;
+    //const float k_H = 1;
+
+    const float S_L = 1;
+    const float S_C = 1 + 0.045 * eucNorm( & vColor1.val[1], 2 );
+    const float S_H = 1 + 0.015 * eucNorm( & vColor1.val[1], 2 );
+    const float deltaC_ab = eucNorm( & vColor1.val[1], 2 ) - eucNorm( & vColor2.val[1], 2 );
+    const float deltaH_ab = sqrt( 0
+        + pow( vColor1.val[1] - vColor2.val[1], 2 )
+        + pow( vColor1.val[2] - vColor2.val[2], 2 )
+        - pow( deltaC_ab, 2)
+        );
+    const float deltaL = vColor1.val[0] - vColor2.val[0];
+    const float colorDiff = sqrt( 0
+        + pow( deltaL / S_L, 2 )
+        + pow( deltaC_ab / S_C, 2 )
+        + pow( deltaH_ab / S_H, 2 )
         );
 
-    const int vNumIterations = 1;
-    cvMorphologyEx(
-        vpImgGray,
-        vpImgGray,
-        NULL,
-        vpVertKernel,
-        CV_MOP_OPEN,
-        vNumIterations
-    );
+    return colorDiff;
+}
 
-    cvReleaseStructuringElement( &vpVertKernel );
-
-    // TEMP
-    apImg->nChannels = 1;
-    cvCopy( vpImgGray, apImg );
-
-    vector<CvScalar> vVertLines = vector<CvScalar>();
-    return vVertLines;  
+// floats and doubles only
+template< typename T >
+T eucNorm(
+    T* apArray,
+    int aNumVals
+    )
+{   
+    T vSum = 0;
+    for ( int i = 0; i < aNumVals; i++ ) {
+        vSum += pow( apArray[i], 2 );
+    }
+    const float vRet = sqrt(vSum);
+    return vRet;
 }
 
 /*
@@ -920,6 +979,8 @@ int detectResistorValue(
         );
 
     // Extract roi into its own IplImage stucture
+    // The reason we do this is because when the roi is set, filter functinos
+    // "return" an image that has the size of the roi
     IplImage* vpImgResStrip = cvCreateImage( 
         cvSize( vRoiBox2D.size.width, vRoiBox2D.size.height ),
         apImg->depth,
@@ -939,7 +1000,8 @@ int detectResistorValue(
     cvCopy( vpImgResStrip, vpImgResStripSmoothed );
     
     // Not sure if this is truly neccary yet
-    #if 0
+    // We need a blur that doesn't ruin edges
+    #if 1
     const int vKernelSize = 7;
     cvSmooth(
         vpImgResStrip,
@@ -954,6 +1016,28 @@ int detectResistorValue(
         );
     #endif
 
+    CvRect vResBodyRect = detectResistorBody( vpImgResStripSmoothed );
+
+    // slightly reduce the area of the roi to reduce background noise
+    const int vWidthReduction = 4 * vResBodyRect.width / 5;
+    const int vHeightReduction = 4 * vResBodyRect.height / 5;
+    vResBodyRect.x += vWidthReduction / 2;
+    vResBodyRect.y += vHeightReduction / 2;
+    vResBodyRect.width -= vWidthReduction / 2;
+    vResBodyRect.height -= vHeightReduction / 2;
+
+    IplImage* vpImgResBody = cvCreateImage( 
+        cvSize( vResBodyRect.width, vResBodyRect.height ),
+        vpImgResStripSmoothed->depth,
+        vpImgResStripSmoothed->nChannels
+        );
+    cvSetImageROI( vpImgResStripSmoothed, vResBodyRect );
+    cvCopy( vpImgResStripSmoothed, vpImgResBody );
+    cvResetImageROI( vpImgResStripSmoothed );
+
+    vector<int> vVertLines = detectVertLines( vpImgResBody );
+
+    // TEMP: Debug/Dev
     apImgTmp->width = vRoiBox2D.size.width;
     apImgTmp->height = vRoiBox2D.size.height;
     cvCopy( vpImgResStripSmoothed, apImgTmp );  
@@ -961,6 +1045,7 @@ int detectResistorValue(
     cvReleaseImage( &vpImgRotated );
     cvReleaseImage( &vpImgResStrip );
     cvReleaseImage( &vpImgResStripSmoothed );
+    cvReleaseImage( &vpImgResBody );
 
     return 0;
 }

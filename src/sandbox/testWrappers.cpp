@@ -345,7 +345,17 @@ void trackbarCallback_detectVertLines( int aUnused ) {
         );
     cvCopy( gpImg, vpImgTmp );
     
-    detectVertLines( vpImgTmp );
+    vector<int> vVertLines = detectVertLines( vpImgTmp );
+    
+    //vector<int> vVertLines = vector<int>();
+    
+    for( int i = 0; i < vVertLines.size(); i++ ) {
+        cvLine( vpImgTmp,
+            cvPoint( vVertLines[i], 0 ),
+            cvPoint( vVertLines[i], vpImgTmp->height ),
+            gColors[4]
+            );
+    }
 
     cvShowImage( gpWindowNameOriginal, gpImg );
     cvShowImage( gpWindowNameOutput, vpImgTmp );

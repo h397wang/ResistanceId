@@ -113,7 +113,18 @@ CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab );
 
 CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab );
 
-vector<CvScalar> detectVertLines( IplImage* apImg );
+vector<int> detectVertLines( IplImage* apImg );
+
+float calcLabColorDistance(
+    CvScalar vColor1,
+    CvScalar vColor2
+    );
+
+template< typename T >
+T eucNorm(
+    T* apArray,
+    int aNumVals
+    );
 
 int detectResistorValue(
     IplImage* apImg,
