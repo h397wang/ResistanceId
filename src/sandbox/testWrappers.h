@@ -12,8 +12,8 @@ int test_haarCascade( char* );
 void trackbarCallback_filterNoise( int );
 int test_filterNoise( char* );
 
-void trackbarCallback_getResistorRoi( int );
-int test_getResistorRoi( char* );
+void trackbarCallback_detectResistorRoiBox2D( int );
+int test_detectResistorRoiBox2D( char* );
 
 void trackbarCallback_detectResistorValue( int );
 int test_detectResistorValue( char* );

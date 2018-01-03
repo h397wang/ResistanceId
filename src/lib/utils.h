@@ -34,7 +34,7 @@ void filterNoise(
     IplImage* apImgDst
     );
 
-CvBox2D getResistorRoi(
+CvBox2D detectResistorRoiBox2D(
     IplImage* apImg,
     const int aHoughLineAccumThresh = 70 // determined through characterization, depends on img size
     );
@@ -97,7 +97,7 @@ CvSeq* getResistorContours(
     int aContourMode
     );
 
-int getResistorStrip(
+int getResistorStripImg(
     IplImage* apImgSrc,
     IplImage* apImgDst
     );
@@ -113,7 +113,10 @@ CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab );
 
 CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab );
 
-vector<int> detectVertLines( IplImage* apImg );
+vector<int> detectVertLines(
+    IplImage* apImg,
+    IplImage* apImgTmp = NULL
+    );
 
 float calcLabColorDistance(
     CvScalar vColor1,
@@ -126,8 +129,20 @@ T eucNorm(
     int aNumVals
     );
 
+void trimRect(
+    CvRect* apRect,
+    const int aWidthReduction,
+    const int aHeightReduction
+    );
+
+void getResistorStripImg(
+    IplImage* apImg,
+    IplImage* apImgResStrip,
+    const CvBox2D aRoiBox2D
+    );
+
 int detectResistorValue(
     IplImage* apImg,
-    IplImage* apImgTmp
+    IplImage* apImgTmp = NULL
     );
 

@@ -254,7 +254,7 @@ int test_filterNoise( char* apImagePath ) {
     return 0;
 }
 
-void trackbarCallback_getResistorRoi( int aUnused ) {
+void trackbarCallback_detectResistorRoiBox2D( int aUnused ) {
 
     IplImage* vpImgTmp = cvCreateImage( 
         cvSize( gpImg->width, gpImg->height ),
@@ -263,7 +263,7 @@ void trackbarCallback_getResistorRoi( int aUnused ) {
         );
     cvCopy( gpImg, vpImgTmp );
     
-    CvBox2D vRoi = getResistorRoi( vpImgTmp, gHoughLineAccumThresh );
+    CvBox2D vRoi = detectResistorRoiBox2D( vpImgTmp, gHoughLineAccumThresh );
     drawCvBox2D( vpImgTmp, vRoi );
 
     cvShowImage( gpWindowNameOriginal, gpImg );
@@ -272,7 +272,7 @@ void trackbarCallback_getResistorRoi( int aUnused ) {
     printf( "gHoughLineAccumThresh: %d\n", gHoughLineAccumThresh );
 }
 
-int test_getResistorRoi( char* apImagePath ) {
+int test_detectResistorRoiBox2D( char* apImagePath ) {
 
     gpImg = cvLoadImage( apImagePath );
     if ( gpImg == NULL ) {
@@ -288,10 +288,10 @@ int test_getResistorRoi( char* apImagePath ) {
         gpWindowNameOutput,
         &gHoughLineAccumThresh,
         max( gpImg->width, gpImg->height ),
-        trackbarCallback_getResistorRoi
+        trackbarCallback_detectResistorRoiBox2D
         );
 
-    trackbarCallback_getResistorRoi( 0 );
+    trackbarCallback_detectResistorRoiBox2D( 0 );
     cvWaitKey( 0 );
     return 0;
 }
@@ -345,10 +345,8 @@ void trackbarCallback_detectVertLines( int aUnused ) {
         );
     cvCopy( gpImg, vpImgTmp );
     
-    vector<int> vVertLines = detectVertLines( vpImgTmp );
-    
-    //vector<int> vVertLines = vector<int>();
-    
+    vector<int> vVertLines = detectVertLines( gpImg, vpImgTmp);
+   
     for( int i = 0; i < vVertLines.size(); i++ ) {
         cvLine( vpImgTmp,
             cvPoint( vVertLines[i], 0 ),
