@@ -114,6 +114,11 @@ CvScalar detectResistorBodyHorizontalAnalysis( IplImage* apImgLab );
 
 CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab );
 
+vector<int> filterFalsePositiveEdges(
+    IplImage* apImg,
+    vector<int> aEdgeXPos
+    );
+
 vector<int> detectVertLines(
     IplImage* apImg,
     IplImage* apImgTmp = NULL
@@ -158,3 +163,6 @@ int detectResistorValue(
     IplImage* apImgTmp = NULL
     );
 
+int median( CvMat* apMat );
+
+CvScalar getMedianColor( IplImage* apImg );

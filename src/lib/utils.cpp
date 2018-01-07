@@ -845,7 +845,7 @@ CvScalar detectResistorBodyVerticalAnalysis( IplImage* apImgLab ) {
 /*
 Brief: 
 Input:
-    IplImage* apImg - cropped image containing only reduced resistor body, lab color space
+    IplImage* apImg - cropped image containing only reduced resistor body, lab color space, filtered
 Output:
     vector<int> aEdgeXPos - 
 */
@@ -861,34 +861,59 @@ vector<int> filterFalsePositiveEdges(
         );
     cvCopy( apImg, vpImg );
 
-    // Account for image boundaries
-    vector<int>::iterator it = aEdgeXPos.begin();
-    aEdgeXPos.insert( it, 0 );
-    aEdgeXPos.push_back( apImg->width );
-    for(int i = 0; i < aEdgeXPos.size() - 1; i++) {
-        const CvRect vStrip = cvRect(
-            aEdgeXPos[i],
+    vector<CvScalar> vRoiMeanColors = vector<CvScalar>();
+
+    // Initialize vector defining ROI vertical boundaries
+    vector<int> vRoiBoundaries = vector<int>();
+    vRoiBoundaries.push_back( 0 );
+    for(int i = 0; i < aEdgeXPos.size(); i++) {
+        vRoiBoundaries.push_back(aEdgeXPos[i]);
+    }
+    vRoiBoundaries.push_back( apImg->width );
+
+    // Filter and get info for each ROI
+    for(int i = 0; i < vRoiBoundaries.size() - 1; i++) {
+        const CvRect vRoi = cvRect(
+            vRoiBoundaries[i],
             0,
-            aEdgeXPos[i + 1],
+            vRoiBoundaries[i + 1] - vRoiBoundaries[i],
             apImg->height
             );
-
-        cvSetImageROI( vpImg, vStrip );
-        cvSmooth(
-            vpImg,
-            vpImg,
-            CV_MEDIAN,
-            3
-            );
-
+        cvSetImageROI( vpImg, vRoi ); 
+        {  
+            cvSmooth(
+                vpImg,
+                vpImg,
+                CV_MEDIAN,
+                3
+                );
+            CvScalar vMeanCol = cvAvg( vpImg );
+            vRoiMeanColors.push_back( vMeanCol );
+        }
         cvResetImageROI( vpImg );
+    }
 
+    vector<int> vFilteredEdges = vector<int>();
+    for(int i = 0; i < vRoiMeanColors.size() - 1; i++) {
+        const float vColorDistance = calcLabColorDistance(
+            vRoiMeanColors[i],
+            vRoiMeanColors[i + 1],
+            CIE94
+            );
+        // TODO: hardcoded threshold
+        printf("vColorDistance: %f\n", vColorDistance);
+        const float vColorDistThresh = 20.00;
+        if ( vColorDistance > vColorDistThresh ) {
+            vFilteredEdges.push_back( aEdgeXPos[i] );
+
+        }
     }
 
     cvReleaseImage( &vpImg );
-    vector<int> vEdges = vector<int>();
-    return vEdges;
+    
+    return vFilteredEdges;
 }
+
 
 /*
 Brief: 
@@ -927,9 +952,9 @@ vector<int> detectVertLines(
         );
 
     const int vCols = 1;
-    const int vRows = 5;
+    const int vRows = 7;
     const int vXAnchor = 0;
-    const int vYAnchor = 2;
+    const int vYAnchor = vRows / 2;
     IplConvKernel* vpKernel = cvCreateStructuringElementEx(
         vCols,
         vRows,
@@ -943,26 +968,26 @@ vector<int> detectVertLines(
         NULL,
         vpKernel,
         CV_MOP_OPEN,
-        4
+        5
         );
 
     // TODO: needs to be done in vertical strips
-    for ( int i = 0; i < 1; i ++ ) {
-        cvSmooth(
-            vpImgLab,
-            vpImgLab,
-            CV_MEDIAN,
-            3
-            );
+    for(int col = 0; col < vpImgLab->width; col++) {
+        const CvRect vVertStrip = cvRect( col, 0, 1, vpImgLab->height );
+        cvSetImageROI( vpImgLab, vVertStrip );
+        //const CvScalar vMedColor = getMedianColor( vpImgLab );
+        // TEMP:
+        //cvSet( vpImgLab, vMedColor );
+        cvResetImageROI( vpImgLab );
     }
 
-    for ( int i = 0; i < 1; i ++ ) {
+    for ( int i = 0; i < 0; i ++ ) {
         cvSmooth(
             vpImgLab,
             vpImgLab,
             CV_BLUR,
-            7,
-            1
+            1, // looks like they're inversed
+            7
             );
     }
 
@@ -970,7 +995,18 @@ vector<int> detectVertLines(
     CvScalar vResBodyColor = getResBodyBgColor( vpImgLab );
 
     // subtract background color
-    
+    for(int col = 0; col < vpImgLab->width; col++) {
+        const CvRect vVertStrip = cvRect( col, 0, 1, vpImgLab->height );
+        cvSetImageROI( vpImgLab, vVertStrip );
+        const CvScalar vMeanColor = cvAvg( vpImgLab );
+
+        const float vColorDistance = calcLabColorDistance( vMeanColor,  vResBodyColor, CIE94 );
+        printf("vColorDistance: %f\n", vColorDistance);
+        if (vColorDistance < 20.00 ) {
+            cvSet( vpImgLab, vMeanColor );
+        }
+        cvResetImageROI( vpImgLab );
+    }
 
     IplImage* vpMeanColColors = cvCreateImage( 
         cvSize( apImg->width, 1 ),
@@ -978,6 +1014,7 @@ vector<int> detectVertLines(
         apImg->nChannels
         );
 
+    // Extract mean color of each vertical strip and cache it
     for(int col = 0; col < vpImgLab->width; col++) {
         const CvRect vVertStrip = cvRect( col, 0, 1, vpImgLab->height );
         cvSetImageROI( vpImgLab, vVertStrip );
@@ -987,12 +1024,10 @@ vector<int> detectVertLines(
     }
 
     const int vNumColsToCmpLhs = apImg->width / 25;
-    const int vNumColsToCmpRhs = 1;  // default 1
-
+    const int vNumColsToCmpRhs = 1;
     vector<int> vVertLineXCoords = vector<int>();
 
     for(int i = vNumColsToCmpLhs; i < apImg->width; i++) {
-
         const CvRect vColsLhsRect = cvRect(
             i - vNumColsToCmpLhs,
             0,
@@ -1015,7 +1050,7 @@ vector<int> detectVertLines(
  
         float vColorDistance = calcLabColorDistance( vMeanColorLhs,  vMeanColorRhs, CIE94 );
         //printf("color distance: %.2f\n", vColorDistance);
-        const float vColorDistThresh = 7.0;
+        const float vColorDistThresh = 10.0;
 
         if ( (vVertLineXCoords.size() == 0 )
             || ( ( vColorDistance > vColorDistThresh )
@@ -1024,6 +1059,8 @@ vector<int> detectVertLines(
             vVertLineXCoords.push_back(i);
         }
     }
+
+    vVertLineXCoords = filterFalsePositiveEdges( vpImgLab, vVertLineXCoords );
 
     if ( apImgTmp != NULL ) { 
         cvCvtColor(
@@ -1208,6 +1245,7 @@ Output:
     CvScalar vBgColor - average background color of resistor body
 */
 // TODO: may be renamed... to a more generic description
+// Use this rather than the median shit
 CvScalar getResBodyBgColor( IplImage* apImg ) {
 
     // Split into seperate channels
@@ -1347,4 +1385,68 @@ int detectResistorValue(
     cvReleaseImage( &vpImgResBody );
 
     return 0;
+}
+
+//Single channel only
+int median( IplImage* apMat ) {
+    const int vNumElements = apMat->height * apMat->width;
+    
+    const int vNumDim = 1;
+    const int vNumBins = 256;
+
+    int vpBinsPerChannel[vNumDim] = { vNumBins };
+    
+    float vpRange[2] = { 0, 256 };
+    float* vppRanges[vNumDim] = { vpRange };
+
+    CvHistogram* vpHisto = cvCreateHist(
+        vNumDim,
+        vpBinsPerChannel,
+        CV_HIST_ARRAY,
+        vppRanges
+        );
+    cvCalcHist( &apMat, vpHisto );
+
+    int vMedian = -1.0;
+    int vCount = 0;
+    for (int i = 0; i < vNumBins; i++ ) {
+        // Hack to accomodate for deprecated C API :(
+        // TODO: doesn't look right
+        // This is getting garbage values??
+        const int vBinCount = (int) vpHisto->mat.data.db[i];
+        printf("vBinCount: %d\n", vBinCount);
+        vCount += vBinCount;
+        if ( vCount >  ( vNumElements / 2 ) ) {
+            vMedian = i;
+            break;
+        }
+    }
+
+    return vMedian;
+}
+
+
+CvScalar getMedianColor( IplImage* apImg ) {
+
+    IplImage* vppChannels[3];
+
+    for(int i = 0; i < 3; i++ ) {
+        vppChannels[i] = cvCreateImage( cvGetSize(apImg), apImg->depth, 1 );
+    }
+
+    cvSplit(
+        apImg,
+        vppChannels[0],
+        vppChannels[1],
+        vppChannels[2],
+        NULL
+        );
+
+    const int vMed0 = median( vppChannels[0] );
+    const int vMed1 = median( vppChannels[1] );
+    const int vMed2 = median( vppChannels[2] );
+    
+    CvScalar vMedColor = cvScalar( vMed0, vMed1, vMed2 );
+    //printf("dColor: %f, %d")
+    return vMedColor;
 }
