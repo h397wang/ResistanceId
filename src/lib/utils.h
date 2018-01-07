@@ -6,6 +6,7 @@
 
 #include <math.h>
 #include <assert.h>
+#include <cstdarg>
 
 using namespace std;
 
@@ -66,9 +67,9 @@ T getDegFromRad( T aRad );
 template< typename T >
 T getRadFromDeg( T aDeg );
 
-void printImgValues( IplImage* apImg );
-
 void printArrayValues( const CvMat* apMat );
+
+void printImgValues( IplImage* apImg );
 
 void printCvBox2DValues( const CvBox2D aBox2D );
 
@@ -102,7 +103,7 @@ int getResistorStripImg(
     IplImage* apImgDst
     );
 
-void equalizeColorDistribution(
+void equalizeLabColorDistribution(
     IplImage* apImgSrc,
     IplImage* apImgDst
     );
@@ -118,9 +119,15 @@ vector<int> detectVertLines(
     IplImage* apImgTmp = NULL
     );
 
+typedef enum {
+    CIE94,
+    CIEDE2000,
+} labColorDistanceMethod_t;
+
 float calcLabColorDistance(
     CvScalar vColor1,
-    CvScalar vColor2
+    CvScalar vColor2,
+    labColorDistanceMethod_t aMethod
     );
 
 template< typename T >
@@ -128,6 +135,9 @@ T eucNorm(
     T* apArray,
     int aNumVals
     );
+
+template< typename T >
+T eucNorm( int aNumVals, ... );
 
 void trimRect(
     CvRect* apRect,
@@ -140,6 +150,8 @@ void getResistorStripImg(
     IplImage* apImgResStrip,
     const CvBox2D aRoiBox2D
     );
+
+CvScalar getResBodyBgColor( IplImage* apImg );
 
 int detectResistorValue(
     IplImage* apImg,

@@ -354,11 +354,20 @@ void printCvBox2DValues( const CvBox2D aBox2D ) {
 }
 
 void printImgValues( IplImage* apImg ) {
-    printf( "apImg->roi->xOffset: %d\n", apImg->roi->xOffset );
-    printf( "apImg->roi->yOffset: %d\n", apImg->roi->yOffset );
+    //printf( "apImg->roi->xOffset: %d\n", apImg->roi->xOffset );
+    ///printf( "apImg->roi->yOffset: %d\n", apImg->roi->yOffset );
     printf( "apImg->depth: %d\n", apImg->depth );
     printf( "apImg->width: %d\n", apImg->width );
     printf( "apImg->height: %d\n", apImg->height );
+
+    for( int y = 0; y < apImg->height; y++ ) {
+        uchar* ptr = (uchar*) ( apImg->imageData + y * apImg->widthStep );
+        for( int x = 0; x < apImg->width; x++ ) {
+            printf("(%d, %d, %d)", ptr[3 * x + 0] , ptr[3 * x + 1] , ptr[3 * x + 2] );
+        }
+        printf("\n");
+    }
+
 }
 
 // floats and double types only
@@ -838,6 +847,54 @@ Brief:
 Input:
     IplImage* apImg - cropped image containing only reduced resistor body, lab color space
 Output:
+    vector<int> aEdgeXPos - 
+*/
+vector<int> filterFalsePositiveEdges(
+    IplImage* apImg,
+    vector<int> aEdgeXPos
+    )
+{
+    IplImage* vpImg = cvCreateImage( 
+        cvGetSize( apImg ),
+        apImg->depth,
+        apImg->nChannels
+        );
+    cvCopy( apImg, vpImg );
+
+    // Account for image boundaries
+    vector<int>::iterator it = aEdgeXPos.begin();
+    aEdgeXPos.insert( it, 0 );
+    aEdgeXPos.push_back( apImg->width );
+    for(int i = 0; i < aEdgeXPos.size() - 1; i++) {
+        const CvRect vStrip = cvRect(
+            aEdgeXPos[i],
+            0,
+            aEdgeXPos[i + 1],
+            apImg->height
+            );
+
+        cvSetImageROI( vpImg, vStrip );
+        cvSmooth(
+            vpImg,
+            vpImg,
+            CV_MEDIAN,
+            3
+            );
+
+        cvResetImageROI( vpImg );
+
+    }
+
+    cvReleaseImage( &vpImg );
+    vector<int> vEdges = vector<int>();
+    return vEdges;
+}
+
+/*
+Brief: 
+Input:
+    IplImage* apImg - cropped image containing only reduced resistor body, lab color space
+Output:
     vector<CvScalar> vVertLines - 
 */
 vector<int> detectVertLines(
@@ -889,7 +946,8 @@ vector<int> detectVertLines(
         4
         );
 
-    for ( int i = 0; i < 4; i ++ ) { 
+    // TODO: needs to be done in vertical strips
+    for ( int i = 0; i < 1; i ++ ) {
         cvSmooth(
             vpImgLab,
             vpImgLab,
@@ -898,7 +956,7 @@ vector<int> detectVertLines(
             );
     }
 
-    for ( int i = 0; i < 0; i ++ ) {
+    for ( int i = 0; i < 1; i ++ ) {
         cvSmooth(
             vpImgLab,
             vpImgLab,
@@ -907,6 +965,12 @@ vector<int> detectVertLines(
             1
             );
     }
+
+    // detect background color of resistor body
+    CvScalar vResBodyColor = getResBodyBgColor( vpImgLab );
+
+    // subtract background color
+    
 
     IplImage* vpMeanColColors = cvCreateImage( 
         cvSize( apImg->width, 1 ),
@@ -919,37 +983,43 @@ vector<int> detectVertLines(
         cvSetImageROI( vpImgLab, vVertStrip );
         const CvScalar vMeanColor = cvAvg( vpImgLab );
         cvResetImageROI( vpImgLab );
-
-        printf("Mean Color %.2f, %.2f, %.2f \n", vMeanColor.val[0], vMeanColor.val[1], vMeanColor.val[2]);
         cvSet2D( vpMeanColColors, 0, col, vMeanColor );
     }
 
-    const int vNumPrevColsToCmp = apImg->width / 25;
+    const int vNumColsToCmpLhs = apImg->width / 25;
+    const int vNumColsToCmpRhs = 1;  // default 1
 
     vector<int> vVertLineXCoords = vector<int>();
 
-    for(int i = vNumPrevColsToCmp; i < apImg->width; i++) {
+    for(int i = vNumColsToCmpLhs; i < apImg->width; i++) {
 
-        const CvRect vPrevColsRect = cvRect(
-            i - vNumPrevColsToCmp,
+        const CvRect vColsLhsRect = cvRect(
+            i - vNumColsToCmpLhs,
             0,
-            vNumPrevColsToCmp,
+            vNumColsToCmpLhs,
             apImg->height
             );
-        cvSetImageROI( vpMeanColColors, vPrevColsRect );
-        const CvScalar vMeanColor = cvAvg( vpMeanColColors );
-        printf("Mean Color of prev block: %.2f, %.2f, %.2f \n", vMeanColor.val[0], vMeanColor.val[1], vMeanColor.val[2]);
-
+        cvSetImageROI( vpMeanColColors, vColsLhsRect );
+        const CvScalar vMeanColorLhs = cvAvg( vpMeanColColors );
         cvResetImageROI( vpMeanColColors );
 
-        const CvScalar vCurrentColor = cvGet2D( vpMeanColColors, 0, i );
-        float vColorDistance = calcLabColorDistance( vCurrentColor,  vMeanColor );
-        printf("color distance: %.2f\n", vColorDistance);
+        const CvRect vColsRhsRect = cvRect(
+            i,
+            0,
+            vNumColsToCmpRhs,
+            apImg->height
+            );
+        cvSetImageROI( vpMeanColColors, vColsRhsRect );
+        const CvScalar vMeanColorRhs = cvAvg( vpMeanColColors );
+        cvResetImageROI( vpMeanColColors );
+ 
+        float vColorDistance = calcLabColorDistance( vMeanColorLhs,  vMeanColorRhs, CIE94 );
+        //printf("color distance: %.2f\n", vColorDistance);
         const float vColorDistThresh = 7.0;
 
         if ( (vVertLineXCoords.size() == 0 )
             || ( ( vColorDistance > vColorDistThresh )
-            && ( i - vVertLineXCoords.back() > vNumPrevColsToCmp ) )
+            && ( i - vVertLineXCoords.back() > vNumColsToCmpLhs ) )
             ) {
             vVertLineXCoords.push_back(i);
         }
@@ -971,24 +1041,12 @@ vector<int> detectVertLines(
     return vVertLineXCoords;
 }
 
-/*
-Brief: 
-Input:
-    CvScalar vColor1 - 
-    CvScalar vColor2 -    
-Output:
-    int vResistorValue - resistance of resistor (Ohms)
-*/
-float calcLabColorDistance(
+
+float calcLabColorDistance_CIE94(
     CvScalar vColor1,
     CvScalar vColor2
     )
 {
-
-    //const float k_L = 1;
-    //const float k_C = 1;
-    //const float k_H = 1;
-
     const float S_L = 1;
     const float S_C = 1 + 0.045 * eucNorm( & vColor1.val[1], 2 );
     const float S_H = 1 + 0.015 * eucNorm( & vColor1.val[1], 2 );
@@ -999,13 +1057,67 @@ float calcLabColorDistance(
         - pow( deltaC_ab, 2)
         );
     const float deltaL = vColor1.val[0] - vColor2.val[0];
-    const float colorDiff = sqrt( 0
+    const float deltaE = sqrt( 0
         + pow( deltaL / S_L, 2 )
         + pow( deltaC_ab / S_C, 2 )
         + pow( deltaH_ab / S_H, 2 )
         );
 
-    return colorDiff;
+    return deltaE;
+}
+
+
+float calcLabColorDistance_CIEDE2000(
+    CvScalar vColor1,
+    CvScalar vColor2
+    )
+{
+
+    const float deltaL = vColor2.val[0] - vColor1.val[0];
+    const float meanL = ( vColor2.val[0] + vColor1.val[0] ) / 2;
+    const float meanC = ( vColor2.val[0] + vColor1.val[0] ) / 2;
+    const float a_1_prime = vColor1.val[1]
+        + ( vColor1.val[1] / 2 )
+        * ( 1 - sqrt( pow( meanC, 7 ) / ( pow( meanC, 7 ) + pow( 25, 7 ) ) ) );
+    const float a_2_prime = vColor2.val[1]
+        + ( vColor2.val[1] / 2 )
+        * ( 1 - sqrt( pow( meanC, 7 ) / ( pow( meanC, 7 ) + pow( 25, 7 ) ) ) );
+    const float C_1_prime = eucNorm<float>( 2, a_1_prime, vColor1.val[2] );
+    const float C_2_prime = eucNorm<float>( 2, a_2_prime, vColor2.val[2] );
+    
+    const float deltaE = 0;
+    return deltaE;
+}
+
+/*
+Brief: 
+Input:
+    CvScalar vColor1 - 
+    CvScalar vColor2 -    
+Output:
+    int vResistorValue - resistance of resistor (Ohms)
+*/
+float calcLabColorDistance(
+    CvScalar aColor1,
+    CvScalar aColor2,
+    labColorDistanceMethod_t aMethod
+    )
+{
+    float vColorDiff = 0;
+
+    switch (aMethod) {
+    case CIE94:
+        vColorDiff = calcLabColorDistance_CIE94( aColor1, aColor2 );
+        break;
+    case CIEDE2000:
+        vColorDiff = calcLabColorDistance_CIEDE2000( aColor1, aColor2 );     
+        break;
+    default:
+        printf("Invalid argument aMethod\n");
+        assert(0);
+        break;
+    }
+    return vColorDiff;
 }
 
 // floats and doubles only
@@ -1023,6 +1135,21 @@ T eucNorm(
     return vRet;
 }
 
+template< typename T >
+T eucNorm( int aNumVals, ... ) {
+    va_list vNumList;
+    va_start( vNumList, aNumVals ); 
+
+    T vSum = 0;
+    for ( int i = 0; i < aNumVals; i++ ) {
+        T vNum = (T) va_arg( vNumList, double );
+        vSum += pow( vNum, 2 );
+    }
+    va_end( vNumList );
+
+    const float vRet = sqrt(vSum);
+    return vRet;
+}
 
 void trimRect(
     CvRect* apRect,
@@ -1071,6 +1198,109 @@ void getResistorStripImg(
     cvReleaseImage( &vpImgRotated );
 }
 
+
+/*
+Brief: Color of the resistor body should correspond to histogram bin with highest frequency 
+        Currently only supports 3 channel images
+Input:
+    IplImage* apImg - original image containing the resistor body, only supports lab color space input?
+Output:
+    CvScalar vBgColor - average background color of resistor body
+*/
+// TODO: may be renamed... to a more generic description
+CvScalar getResBodyBgColor( IplImage* apImg ) {
+
+    // Split into seperate channels
+    const int vNumChannels = 3;
+
+    IplImage* vppChannels[vNumChannels];
+    for ( int i = 0; i < vNumChannels; i++ ) {
+        vppChannels[i] = cvCreateImage( cvGetSize(apImg), apImg->depth, 1 );
+    }
+    cvSplit(
+        apImg,
+        vppChannels[0],
+        vppChannels[1],
+        vppChannels[2],
+        NULL
+        );
+
+    const int vNumBinsL = 8;
+    const int vNumBinsA = 16;
+    const int vNumBinsB = 16;
+    
+    const int vLowerBoundL = 0;
+    const int vLowerBoundA = 0;
+    const int vLowerBoundB = 0;
+    
+    const int vUpperBoundL = 255;
+    const int vUpperBoundA = 255;
+    const int vUpperBoundB = 255;
+
+    int vpBinsPerChannel[vNumChannels] = { vNumBinsL, vNumBinsA, vNumBinsB };
+    float vpRangeL[2] = { vLowerBoundL, vUpperBoundL };
+    float vpRangeA[2] = { vLowerBoundA, vUpperBoundA };
+    float vpRangeB[2] = { vLowerBoundB, vUpperBoundB };
+
+    float* vppRanges[vNumChannels] = {
+        vpRangeL,
+        vpRangeA,
+        vpRangeB
+        };
+
+    CvHistogram* vpHisto = cvCreateHist(
+        vNumChannels,
+        vpBinsPerChannel,
+        CV_HIST_ARRAY,
+        vppRanges,
+        1
+        );
+
+    cvCalcHist( vppChannels, vpHisto );
+    cvNormalizeHist( vpHisto, 1.0 );
+
+    float vMinVal = 0;
+    float vMaxVal = 0;
+    
+    int vpMinIndices[vNumChannels] = { 1, 1, 1 };
+    int vpMaxIndices[vNumChannels] = { 1, 1, 1 };
+    
+    cvGetMinMaxHistValue(
+        vpHisto,
+        &vMinVal, 
+        &vMaxVal, 
+        vpMinIndices, 
+        vpMaxIndices
+        );
+
+    printf("Max value: ");
+    printf("%f\n", vMaxVal);
+
+    printf("Min indices: ");    
+    printf("%d, %d, %d\n",
+        vpMinIndices[0],
+        vpMinIndices[1],
+        vpMinIndices[2]
+        );
+
+    printf("Max indices: ");    
+    printf("%d, %d, %d\n",
+        vpMaxIndices[0],
+        vpMaxIndices[1],
+        vpMaxIndices[2]
+        );
+
+    const int vValL = (float(vpMaxIndices[0]) + 0.5) * ( vpRangeL[1] - vpRangeL[0] + 1) / vNumBinsL;
+    const int vValA = (float(vpMaxIndices[1]) + 0.5) * ( vpRangeA[1] - vpRangeA[0] + 1) / vNumBinsA;
+    const int vValB = (float(vpMaxIndices[2]) + 0.5) * ( vpRangeB[1] - vpRangeB[0] + 1) / vNumBinsB;
+    
+    printf( "CvScalar: %d, %d, %d\n", vValL, vValA, vValB );
+    CvScalar vBgColor = cvScalar( vValL, vValA, vValB );
+    return vBgColor;
+}
+
+
+
 /*
 Brief: Highest level function 
 Input:
@@ -1110,8 +1340,6 @@ int detectResistorValue(
     vector<int> vVertLines = detectVertLines( vpImgResBody );
 
     if ( apImgTmp != NULL ) {
-        //apImgTmp->width = vResBodyRect.width;
-        //apImgTmp->height = vResBodyRect.height;
         cvCopy( vpImgResBody, apImgTmp );  
     }
 
