@@ -156,7 +156,7 @@ void getResistorStripImg(
     const CvBox2D aRoiBox2D
     );
 
-CvScalar getResBodyBgColor( IplImage* apImg );
+CvScalar getDominantColor( IplImage* apImg );
 
 int detectResistorValue(
     IplImage* apImg,

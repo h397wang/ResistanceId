@@ -885,7 +885,7 @@ vector<int> filterFalsePositiveEdges(
                 vpImg,
                 vpImg,
                 CV_MEDIAN,
-                3
+                7
                 );
             CvScalar vMeanCol = cvAvg( vpImg );
             vRoiMeanColors.push_back( vMeanCol );
@@ -899,10 +899,13 @@ vector<int> filterFalsePositiveEdges(
             vRoiMeanColors[i],
             vRoiMeanColors[i + 1],
             CIE94
+            //CIEDE2000
             );
+        // Use dominant color 
         // TODO: hardcoded threshold
         printf("vColorDistance: %f\n", vColorDistance);
-        const float vColorDistThresh = 20.00;
+        // Check channels individually too
+        const float vColorDistThresh = 5.00;
         if ( vColorDistance > vColorDistThresh ) {
             vFilteredEdges.push_back( aEdgeXPos[i] );
 
@@ -934,11 +937,15 @@ vector<int> detectVertLines(
         apImg->depth,
         apImg->nChannels
         );
+    cvCopy( apImg, vpImgEqualized );
+
+    // Equalization of L channel is not good as it increases the variance and range
+    #if 0
     equalizeColorDistribution(
         apImg,
         vpImgEqualized
         );
-
+    #endif
     IplImage* vpImgLab = cvCreateImage( 
         cvGetSize( apImg ),
         apImg->depth,
@@ -972,16 +979,17 @@ vector<int> detectVertLines(
         );
 
     // TODO: needs to be done in vertical strips
+    #if 0
     for(int col = 0; col < vpImgLab->width; col++) {
         const CvRect vVertStrip = cvRect( col, 0, 1, vpImgLab->height );
         cvSetImageROI( vpImgLab, vVertStrip );
-        //const CvScalar vMedColor = getMedianColor( vpImgLab );
-        // TEMP:
-        //cvSet( vpImgLab, vMedColor );
+        const CvScalar vDominantColor = getDominantColor( vpImgLab );
+        cvSet( vpImgLab, vDominantColor );
         cvResetImageROI( vpImgLab );
     }
+    #endif
 
-    for ( int i = 0; i < 0; i ++ ) {
+    for ( int i = 0; i < 1; i ++ ) {
         cvSmooth(
             vpImgLab,
             vpImgLab,
@@ -992,21 +1000,24 @@ vector<int> detectVertLines(
     }
 
     // detect background color of resistor body
-    CvScalar vResBodyColor = getResBodyBgColor( vpImgLab );
+    CvScalar vResBodyColor = getDominantColor( vpImgLab );
 
     // subtract background color
+    #if 0
     for(int col = 0; col < vpImgLab->width; col++) {
         const CvRect vVertStrip = cvRect( col, 0, 1, vpImgLab->height );
         cvSetImageROI( vpImgLab, vVertStrip );
         const CvScalar vMeanColor = cvAvg( vpImgLab );
 
         const float vColorDistance = calcLabColorDistance( vMeanColor,  vResBodyColor, CIE94 );
-        printf("vColorDistance: %f\n", vColorDistance);
-        if (vColorDistance < 20.00 ) {
-            cvSet( vpImgLab, vMeanColor );
+        //printf("vColorDistance: %f\n", vColorDistance);
+        if (vColorDistance < 8.00 ) {
+            //cvSet( vpImgLab, cvScalar( 255, 128, 128 ) );
+            //cvSet( vpImgLab, vMeanColor );
         }
         cvResetImageROI( vpImgLab );
     }
+    #endif
 
     IplImage* vpMeanColColors = cvCreateImage( 
         cvSize( apImg->width, 1 ),
@@ -1050,8 +1061,7 @@ vector<int> detectVertLines(
  
         float vColorDistance = calcLabColorDistance( vMeanColorLhs,  vMeanColorRhs, CIE94 );
         //printf("color distance: %.2f\n", vColorDistance);
-        const float vColorDistThresh = 10.0;
-
+        const float vColorDistThresh = 4.0;
         if ( (vVertLineXCoords.size() == 0 )
             || ( ( vColorDistance > vColorDistThresh )
             && ( i - vVertLineXCoords.back() > vNumColsToCmpLhs ) )
@@ -1121,8 +1131,54 @@ float calcLabColorDistance_CIEDE2000(
         * ( 1 - sqrt( pow( meanC, 7 ) / ( pow( meanC, 7 ) + pow( 25, 7 ) ) ) );
     const float C_1_prime = eucNorm<float>( 2, a_1_prime, vColor1.val[2] );
     const float C_2_prime = eucNorm<float>( 2, a_2_prime, vColor2.val[2] );
-    
-    const float deltaE = 0;
+    const float mean_C_prime =  ( C_1_prime + C_2_prime ) / 2;
+    const float delta_C_prime = C_2_prime - C_1_prime;
+    const float h_1_prime = getDegFromRad( atan2( vColor1.val[2], a_1_prime ) ); 
+    const float h_2_prime = getDegFromRad( atan2( vColor2.val[2], a_2_prime ) );
+    float delta_h = h_2_prime - h_1_prime;
+    if ( 1
+        && ( abs( h_2_prime - h_1_prime ) > 180 ) 
+        && ( h_2_prime <= h_1_prime ) )
+    { 
+        delta_h += 360;
+    } else if ( 1
+        && ( abs( h_2_prime - h_1_prime ) > 180 ) 
+        && ( h_2_prime > h_1_prime ) )
+    {
+        delta_h -= 360;
+    }
+    const float delta_H_prime = 2 * sqrt( C_1_prime * C_1_prime ) * sin( getRadFromDeg( delta_h / 2) );
+    float mean_H_prime = ( h_1_prime + h_2_prime ) / 2;
+    if ( 1
+        && ( abs( h_2_prime - h_1_prime ) > 180 ) 
+        && ( h_1_prime + h_2_prime < 360 ) )
+    { 
+        mean_H_prime += 180;
+    } else if ( 1
+        && ( abs( h_2_prime - h_1_prime ) > 180 ) 
+        && ( h_1_prime + h_2_prime >= 360 ) )
+    {
+        mean_H_prime -= 180;
+    }
+    const float T = 1
+        - 0.17 * cos( getRadFromDeg( mean_H_prime - 30 ) )
+        + 0.24 * cos( getRadFromDeg( 2 * mean_H_prime ) )
+        + 0.32 * cos( getRadFromDeg( 3 * mean_H_prime + 6 ) )
+        - 0.20 * cos( getRadFromDeg( 4 * mean_H_prime - 63 ) );
+    const float S_L = 1 + ( 0.015 * pow( ( meanL - 50 ), 2 ) ) /
+        sqrt( 20 + pow( ( meanL - 50 ), 2 ) );
+    const float S_C = 1 + 0.045 * mean_C_prime;
+    const float S_H = 1 + 0.015 * mean_C_prime * T;
+    const float R_T = -2
+        * sqrt( pow( mean_C_prime, 7 ) / ( pow( mean_C_prime, 7 ) + pow( 25, 7 ) ) )
+        * sin( getRadFromDeg( 60 * exp(- pow( ( mean_H_prime - 275 ) / 25 , 2 ) ) ) );
+
+    const float deltaE = sqrt( 0
+        + pow( deltaL / S_L, 2 )
+        + pow( delta_C_prime / S_C, 2 )
+        + pow( delta_H_prime / S_H, 2 )
+        + R_T * delta_C_prime * delta_H_prime / ( S_C * S_H )
+        );
     return deltaE;
 }
 
@@ -1246,7 +1302,7 @@ Output:
 */
 // TODO: may be renamed... to a more generic description
 // Use this rather than the median shit
-CvScalar getResBodyBgColor( IplImage* apImg ) {
+CvScalar getDominantColor( IplImage* apImg ) {
 
     // Split into seperate channels
     const int vNumChannels = 3;
