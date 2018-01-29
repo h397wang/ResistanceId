@@ -2,9 +2,8 @@ README.md
 
 
 ## Demo
-![alt text](https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png)
-![alt text](https://github.com/h397wang/ResistanceId/tree/master/demo/demo1.png)
-![alt text](https://github.com/h397wang/ResistanceId/tree/master/demo/demo2.png)
+<a href="https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png"><img src="https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png" align="top" width="300" ></a>
+
 
 ## Reference
 See the following paper:
