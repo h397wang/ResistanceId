@@ -131,10 +131,11 @@ int test_haarCascade( char* apImagePath ) {
 
     Mat frame = imread( apImagePath );
 
-    const char* vCascadeFile = "/Users/henrywang/Documents/SideProjects/opencv-3.2.0/data/haarcascades/haarcascade_eye.xml";
+    //const char* vCascadeFile = "/Users/henrywang/Documents/SideProjects/opencv-3.2.0/data/haarcascades/haarcascade_eye.xml";
+    const char* vCascadeFile = "/Users/henrywang/Documents/SideProjects/ComputerVisionProj/ResistanceId/data/data_24_24/cascade.xml";
     CascadeClassifier vDetect;
     if ( !vDetect.load(vCascadeFile) ) {
-        printf("ERROR: Could not load face cascade\n");
+        printf("ERROR: Could not load cascade\n");
         return -1;
     }
     vector<Rect> vRois;
@@ -142,17 +143,15 @@ int test_haarCascade( char* apImagePath ) {
     vDetect.detectMultiScale(
         frame,
         vRois,
-        1.1,
-        2,
+        1.1, // scale factor
+        4,   // min neighbours?
         0
-        //|CASCADE_FIND_BIGGEST_OBJECT
+        |CASCADE_FIND_BIGGEST_OBJECT
         //|CASCADE_DO_ROUGH_SEARCH
         | CASCADE_SCALE_IMAGE,
         Size(24, 24),
         Size(200, 200)
         );
-
-    printf("num of rois %lu\n", vRois.size());
 
     for ( size_t i = 0; i < vRois.size(); i++ ) {
         Rect r = vRois[i];
