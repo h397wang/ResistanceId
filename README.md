@@ -1,10 +1,15 @@
 README.md
 
+
+## Demo
+<a href="https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png"><img src="https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png" align="center" ></a> <a href="https://github.com/h397wang/ResistanceId/tree/master/demo/demo1.png"><img src="https://github.com/h397wang/ResistanceId/tree/master/demo/demo1.png" align="center" ></a> <a href="https://github.com/h397wang/ResistanceId/tree/master/demo/demo2.png"><img src="https://github.com/h397wang/ResistanceId/tree/master/demo/demo2.png" align="center" ></a> 
+
+
 ## Reference
 See the following paper:
 Automated Resistor Classification by
 Pascal Niklaus and Gian Ulli, from
-Distributed Computing Group, Computer Engineering and Networks Laboratory, ETH Zürich
+Distributed Computing Group, Computer Engineering and Networks Laboratory, ETH Zürich
 
 Pipeline Description
 
