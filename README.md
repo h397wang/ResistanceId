@@ -28,7 +28,8 @@ The wires connected to a resistor body are
 In this stage the filter attempts to get rid of camera artifacts (e.g salt and pepper noise) in preparation for the next step.
 
 1.2 Hough Line Detection
-The resistor body and its wires are not neccesarily perfectly horizontal and is assumed to be in any orientation. The Hough Line algorithm will detect various straight lines in the image based on arbitruary thresholding.
+The resistor body and its wires are not neccesarily perfectly horizontal and is assumed to be in any orientation.
+The Hough Line algorithm will detect various straight lines in the image based on arbitruary thresholding.
 
 1.3 Statistical Analysis
 The set of lines returned from the Hough transform are analyzed and "similar lines" are grouped together. Since
