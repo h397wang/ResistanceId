@@ -2,8 +2,11 @@ README.md
 
 
 ## Demo
-<a href="https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png"><img src="https://github.com/h397wang/ResistanceId/tree/master/demo/demo0.png" align="top" width="300" ></a>
+![alt text](demo/demo0.png)
 
+![alt text](demo/demo1.png)
+
+![alt text](demo/demo2.png)
 
 ## Reference
 See the following paper:
