@@ -34,5 +34,5 @@ The resistor body and its wires are not neccesarily perfectly horizontal and is 
 1.3 Statistical Analysis
 The set of lines returned from the Hough transform are analyzed and "similar lines" are grouped together. Since
 
-2. Color Ring Detection
-Edge Detection
+2.Color Ring Detection
+Edge Detection to be completed. Current issues with color matching are non-trivial.
