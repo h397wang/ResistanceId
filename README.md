@@ -14,9 +14,7 @@ Automated Resistor Classification by
 Pascal Niklaus and Gian Ulli, from
 Distributed Computing Group, Computer Engineering and Networks Laboratory, ETH Zürich
 
-Pipeline Description
-
-Key Assumptions
+## Key Assumptions
 1. Low Noise Background
 The image background should be quite plain (e.g a piece of paper).
 2. Single Resistor
@@ -24,6 +22,7 @@ For simplicity there should only be one resistor present
 3. Straight Wires
 The wires connected to a resistor body are 
 
+## Pipeline Description
 1. Resistor Localization
 1.1 Noise Filtering
 In this stage the filter attempts to get rid of camera artifacts (e.g salt and pepper noise) in preparation for the next step.
