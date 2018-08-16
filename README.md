@@ -46,7 +46,7 @@ The Hough Line algorithm will detect various straight lines in the image based o
 The set of lines returned from the Hough transform are analyzed and "similar lines" are grouped together. Quantifying the
 similarity of lines is still quite arbitrary.
 
-2.Color Ring Detection
+2. Color Ring Detection
 
 Each color band on the resistor needs to be identified. Current issues with color matching are non-trivial.
 To to be completed.
