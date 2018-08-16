@@ -33,7 +33,8 @@ The resistor body and its wires are not neccesarily perfectly horizontal and is 
 The Hough Line algorithm will detect various straight lines in the image based on arbitruary thresholding.
 
 1.3 Statistical Analysis
-The set of lines returned from the Hough transform are analyzed and "similar lines" are grouped together. Since
+The set of lines returned from the Hough transform are analyzed and "similar lines" are grouped together. Quantifying the
+similarity of lines is still quite arbitrary.
 
 2.Color Ring Detection
 Edge Detection to be completed. Current issues with color matching are non-trivial.
